@@ -124,6 +124,14 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
     }
   }
 
+  Future<void> _navigateToTaskManagement() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const TaskManagementScreen()),
+    );
+    await _loadTasks();
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -144,6 +152,14 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
               'No tienes aseo asignado esta semana',
               style: textTheme.bodyLarge,
             ),
+            if (widget.currentUser.isAdmin) ...[
+              const SizedBox(height: 24),
+              OutlinedButton.icon(
+                onPressed: _navigateToTaskManagement,
+                icon: const Icon(Icons.edit),
+                label: const Text('Editar Actividades'),
+              ),
+            ],
           ],
         ),
       );
@@ -169,17 +185,9 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
                   ),
                   if (widget.currentUser.isAdmin)
                     IconButton(
-                      icon: const Icon(Icons.settings),
-                      tooltip: 'Gestionar actividades',
-                      onPressed: () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const TaskManagementScreen(),
-                          ),
-                        );
-                        await _loadTasks();
-                      },
+                      icon: const Icon(Icons.edit),
+                      tooltip: 'Editar actividades',
+                      onPressed: _navigateToTaskManagement,
                     ),
                 ],
               ),
@@ -198,24 +206,25 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
             itemCount: _tasks.length,
             itemBuilder: (context, index) {
               final task = _tasks[index];
-              return CheckboxListTile(
-                value: task.isCompleted,
-                onChanged: (value) => _toggleTask(index),
+              return ListTile(
+                onTap: () => _toggleTask(index),
                 title: Text(
                   task.title,
                   style: TextStyle(
                     decoration: task.isCompleted
                         ? TextDecoration.lineThrough
                         : null,
+                    color: task.isCompleted
+                        ? colorScheme.onSurfaceVariant
+                        : null,
                   ),
                 ),
-                secondary: Icon(
+                trailing: Icon(
                   task.isCompleted ? Icons.check_circle : Icons.circle_outlined,
                   color: task.isCompleted
                       ? colorScheme.primary
                       : colorScheme.outline,
                 ),
-                controlAffinity: ListTileControlAffinity.leading,
               );
             },
           ),

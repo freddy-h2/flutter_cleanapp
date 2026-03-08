@@ -14,6 +14,7 @@ class AuthScreen extends StatefulWidget {
 class _AuthScreenState extends State<AuthScreen> {
   bool _isLogin = true;
   bool _isLoading = false;
+  bool _showEmailVerification = false;
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -49,6 +50,14 @@ class _AuthScreenState extends State<AuthScreen> {
             'role': 'user',
           },
         );
+        // Show email verification screen after successful signup
+        if (mounted) {
+          setState(() {
+            _showEmailVerification = true;
+            _isLoading = false;
+          });
+          return;
+        }
       }
     } on AuthException catch (e) {
       if (mounted) {
@@ -67,8 +76,98 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
+  Widget _buildEmailVerificationView(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Scaffold(
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.mark_email_read_outlined,
+                size: 80,
+                color: colorScheme.primary,
+              ),
+              const SizedBox(height: 24),
+              Text(
+                '¡Registro exitoso!',
+                style: textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Hemos enviado un correo de verificación a:',
+                style: textTheme.bodyLarge,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _emailController.text.trim(),
+                style: textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.primary,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Revisa tu bandeja de entrada (y la carpeta de spam) '
+                        'y haz clic en el enlace de verificación. '
+                        'Después regresa aquí para iniciar sesión.',
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: FilledButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _showEmailVerification = false;
+                      _isLogin = true;
+                      _passwordController.clear();
+                    });
+                  },
+                  icon: const Icon(Icons.login),
+                  label: const Text('Ir a Iniciar Sesión'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_showEmailVerification) {
+      return _buildEmailVerificationView(context);
+    }
+
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
