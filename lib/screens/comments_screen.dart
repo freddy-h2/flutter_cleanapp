@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_cleanapp/data/mock_data.dart';
+import 'package:flutter_cleanapp/data/supabase_service.dart';
+import 'package:flutter_cleanapp/models/cleaning_schedule.dart';
 import 'package:flutter_cleanapp/models/comment.dart';
+import 'package:flutter_cleanapp/models/user_model.dart';
 
 /// Screen with two tabs: Enviar (send anonymous comments) and Recibir (inbox).
 class CommentsScreen extends StatefulWidget {
+  /// The currently authenticated user.
+  final UserModel currentUser;
+
   /// Creates a [CommentsScreen].
-  const CommentsScreen({super.key});
+  const CommentsScreen({super.key, required this.currentUser});
 
   @override
   State<CommentsScreen> createState() => _CommentsScreenState();
@@ -16,13 +21,16 @@ class _CommentsScreenState extends State<CommentsScreen>
   late final TabController _tabController;
   final TextEditingController _messageController = TextEditingController();
 
-  /// Locally tracked sent comments (mock — no backend).
-  final List<Comment> _sentComments = [];
+  bool _isLoading = true;
+  CleaningSchedule? _currentWeekSchedule;
+  UserModel? _responsible;
+  List<Comment> _receivedComments = [];
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _loadData();
   }
 
   @override
@@ -32,8 +40,48 @@ class _CommentsScreenState extends State<CommentsScreen>
     super.dispose();
   }
 
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
+    try {
+      final schedule = await SupabaseService.instance.getCurrentWeekSchedule();
+      UserModel? responsible;
+      List<Comment> comments = [];
+
+      if (schedule != null) {
+        final users = await SupabaseService.instance.getUsers();
+        responsible = users.firstWhere(
+          (u) => u.id == schedule.userId,
+          orElse: () => const UserModel(id: '', name: '?', apartment: ''),
+        );
+
+        // Load comments if current user is the responsible one
+        if (schedule.userId == widget.currentUser.id) {
+          comments = await SupabaseService.instance.getCommentsForSchedule(
+            schedule.id,
+          );
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _currentWeekSchedule = schedule;
+          _responsible = responsible;
+          _receivedComments = comments;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al cargar comentarios: $e')),
+        );
+      }
+    }
+  }
+
   /// Sends the comment typed in [_messageController].
-  void _sendComment() {
+  Future<void> _sendComment() async {
     final text = _messageController.text.trim();
     if (text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -41,14 +89,7 @@ class _CommentsScreenState extends State<CommentsScreen>
       );
       return;
     }
-    final currentSchedule = MockData.schedules.where((s) {
-      final now = DateTime.now();
-      final monday = now.subtract(Duration(days: now.weekday - 1));
-      final weekStart = DateTime(monday.year, monday.month, monday.day);
-      final weekEnd = weekStart.add(const Duration(days: 7));
-      return !s.date.isBefore(weekStart) && s.date.isBefore(weekEnd);
-    });
-    if (currentSchedule.isEmpty) {
+    if (_currentWeekSchedule == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('No hay responsable asignado esta semana'),
@@ -56,24 +97,27 @@ class _CommentsScreenState extends State<CommentsScreen>
       );
       return;
     }
-    setState(() {
-      _sentComments.insert(
-        0,
-        Comment(
-          id: 'sent_${_sentComments.length}',
-          scheduleId: currentSchedule.first.id,
-          message: text,
-          createdAt: DateTime.now(),
-        ),
+    try {
+      await SupabaseService.instance.sendComment(
+        _currentWeekSchedule!.id,
+        text,
       );
-      _messageController.clear();
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('¡Comentario enviado de forma anónima!'),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-      ),
-    );
+      if (mounted) {
+        _messageController.clear();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('¡Comentario enviado de forma anónima!'),
+            backgroundColor: Theme.of(context).colorScheme.primary,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al enviar comentario: $e')),
+        );
+      }
+    }
   }
 
   /// Returns a relative-time string in Spanish for [dateTime].
@@ -94,7 +138,10 @@ class _CommentsScreenState extends State<CommentsScreen>
   Widget _buildSendTab() {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final responsible = MockData.currentWeekResponsible;
+
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -118,12 +165,12 @@ class _CommentsScreenState extends State<CommentsScreen>
           ),
           const SizedBox(height: 16),
           Card(
-            child: responsible != null
+            child: _responsible != null
                 ? ListTile(
                     leading: const CircleAvatar(child: Icon(Icons.person)),
                     title: const Text('Responsable actual'),
                     subtitle: Text(
-                      '${responsible.name} — ${responsible.apartment}',
+                      '${_responsible!.name} — ${_responsible!.apartment}',
                     ),
                   )
                 : const Padding(
@@ -154,28 +201,6 @@ class _CommentsScreenState extends State<CommentsScreen>
               label: const Text('Enviar Comentario'),
             ),
           ),
-          if (_sentComments.isNotEmpty) ...[
-            const SizedBox(height: 24),
-            const Divider(),
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Comentarios enviados',
-                style: textTheme.titleSmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            for (final comment in _sentComments)
-              Card(
-                child: ListTile(
-                  title: Text(comment.message),
-                  subtitle: Text(_formatTime(comment.createdAt)),
-                ),
-              ),
-          ],
         ],
       ),
     );
@@ -186,13 +211,15 @@ class _CommentsScreenState extends State<CommentsScreen>
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    final currentUser = MockData.currentUser;
-    final responsible = MockData.currentWeekResponsible;
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     final isResponsible =
-        responsible != null && responsible.id == currentUser.id;
+        _currentWeekSchedule != null &&
+        _currentWeekSchedule!.userId == widget.currentUser.id;
 
     if (isResponsible) {
-      final comments = MockData.commentsForCurrentSchedule;
       return Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -216,13 +243,13 @@ class _CommentsScreenState extends State<CommentsScreen>
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
-            if (comments.isEmpty)
+            if (_receivedComments.isEmpty)
               const Center(child: Text('No tienes comentarios aún'))
             else
               Expanded(
                 child: ListView(
                   children: [
-                    for (final comment in comments)
+                    for (final comment in _receivedComments)
                       Card(
                         child: ListTile(
                           leading: CircleAvatar(

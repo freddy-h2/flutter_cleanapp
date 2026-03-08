@@ -76,10 +76,13 @@ class _CleanAppState extends State<CleanApp> {
   }
 
   List<Widget> get _screens => [
-    HomeScreen(onNavigateToActivities: () => setState(() => _currentIndex = 1)),
-    const ActivitiesScreen(),
-    const CalendarScreen(),
-    const CommentsScreen(),
+    HomeScreen(
+      currentUser: _currentUser!,
+      onNavigateToActivities: () => setState(() => _currentIndex = 1),
+    ),
+    ActivitiesScreen(currentUser: _currentUser!),
+    CalendarScreen(currentUser: _currentUser!),
+    CommentsScreen(currentUser: _currentUser!),
   ];
 
   void _toggleTheme() {

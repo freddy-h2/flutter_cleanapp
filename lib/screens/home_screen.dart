@@ -1,15 +1,57 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_cleanapp/data/mock_data.dart';
+import 'package:flutter_cleanapp/data/supabase_service.dart';
 import 'package:flutter_cleanapp/models/cleaning_schedule.dart';
 import 'package:flutter_cleanapp/models/user_model.dart';
+import 'package:flutter_cleanapp/screens/admin/user_management_screen.dart';
 
 /// Home screen that shows the current user's cleaning status for the week.
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
+  /// The currently authenticated user.
+  final UserModel currentUser;
+
   /// Callback invoked when the user taps "Ir a Actividades".
   final VoidCallback onNavigateToActivities;
 
   /// Creates a [HomeScreen].
-  const HomeScreen({super.key, required this.onNavigateToActivities});
+  const HomeScreen({
+    super.key,
+    required this.currentUser,
+    required this.onNavigateToActivities,
+  });
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  List<CleaningSchedule> _schedules = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
+    try {
+      final schedules = await SupabaseService.instance.getSchedules();
+      if (mounted) {
+        setState(() {
+          _schedules = schedules;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error al cargar datos: $e')));
+      }
+    }
+  }
 
   /// Returns the Monday of the week containing [date].
   DateTime _mondayOf(DateTime date) {
@@ -26,11 +68,14 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    final UserModel currentUser = MockData.currentUser;
-    final List<CleaningSchedule> schedules = MockData.schedules;
+    final currentUser = widget.currentUser;
 
     final now = DateTime.now();
     final thisMonday = _mondayOf(now);
@@ -38,7 +83,7 @@ class HomeScreen extends StatelessWidget {
 
     // Find the schedule entry for the current week.
     CleaningSchedule? currentWeekSchedule;
-    for (final s in schedules) {
+    for (final s in _schedules) {
       final weekMonday = _mondayOf(s.date);
       if (!weekMonday.isBefore(thisMonday) && !weekMonday.isAfter(thisMonday)) {
         currentWeekSchedule = s;
@@ -51,6 +96,28 @@ class HomeScreen extends StatelessWidget {
         currentWeekSchedule != null &&
         currentWeekSchedule.userId == currentUser.id &&
         !currentWeekSchedule.isCompleted;
+
+    /// Admin panel card shown only to admin users.
+    Widget adminCard() => Column(
+      children: [
+        const SizedBox(height: 16),
+        Card(
+          child: ListTile(
+            leading: Icon(
+              Icons.admin_panel_settings,
+              color: colorScheme.primary,
+            ),
+            title: const Text('Panel de Administración'),
+            subtitle: const Text('Gestionar usuarios del edificio'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const UserManagementScreen()),
+            ),
+          ),
+        ),
+      ],
+    );
 
     if (isResponsible) {
       // State A — user has cleaning duty this week.
@@ -86,11 +153,12 @@ class HomeScreen extends StatelessWidget {
                 subtitle: Text(currentUser.apartment),
               ),
             ),
+            if (currentUser.isAdmin) adminCard(),
             const SizedBox(height: 24),
             FilledButton.icon(
               icon: const Icon(Icons.checklist),
               label: const Text('Ir a Actividades'),
-              onPressed: onNavigateToActivities,
+              onPressed: widget.onNavigateToActivities,
             ),
           ],
         ),
@@ -99,7 +167,7 @@ class HomeScreen extends StatelessWidget {
 
     // State B — user is free this week; find next turn.
     CleaningSchedule? nextSchedule;
-    for (final s in schedules) {
+    for (final s in _schedules) {
       if (s.userId == currentUser.id && s.date.isAfter(now)) {
         if (nextSchedule == null || s.date.isBefore(nextSchedule.date)) {
           nextSchedule = s;
@@ -143,6 +211,7 @@ class HomeScreen extends StatelessWidget {
               subtitle: Text(currentUser.apartment),
             ),
           ),
+          if (currentUser.isAdmin) adminCard(),
         ],
       ),
     );

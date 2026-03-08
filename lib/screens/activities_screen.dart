@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_cleanapp/data/mock_data.dart';
+import 'package:flutter_cleanapp/data/supabase_service.dart';
+import 'package:flutter_cleanapp/models/cleaning_schedule.dart';
 import 'package:flutter_cleanapp/models/cleaning_task.dart';
+import 'package:flutter_cleanapp/models/user_model.dart';
+import 'package:flutter_cleanapp/screens/admin/task_management_screen.dart';
 
 /// Screen that shows the current user's cleaning task checklist for this week.
 class ActivitiesScreen extends StatefulWidget {
+  /// The currently authenticated user.
+  final UserModel currentUser;
+
   /// Creates an [ActivitiesScreen].
-  const ActivitiesScreen({super.key});
+  const ActivitiesScreen({super.key, required this.currentUser});
 
   @override
   State<ActivitiesScreen> createState() => _ActivitiesScreenState();
@@ -14,6 +20,8 @@ class ActivitiesScreen extends StatefulWidget {
 class _ActivitiesScreenState extends State<ActivitiesScreen> {
   List<CleaningTask> _tasks = [];
   bool _hasSchedule = false;
+  bool _isLoading = true;
+  CleaningSchedule? _currentSchedule;
 
   @override
   void initState() {
@@ -21,29 +29,52 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
     _loadTasks();
   }
 
-  void _loadTasks() {
-    final currentUser = MockData.currentUser;
-    final now = DateTime.now();
-    final currentMonday = now.subtract(Duration(days: now.weekday - 1));
-    final currentWeekStart = DateTime(
-      currentMonday.year,
-      currentMonday.month,
-      currentMonday.day,
-    );
-    final currentWeekEnd = currentWeekStart.add(const Duration(days: 7));
+  Future<void> _loadTasks() async {
+    setState(() => _isLoading = true);
+    try {
+      final now = DateTime.now();
+      final currentMonday = now.subtract(Duration(days: now.weekday - 1));
+      final currentWeekStart = DateTime(
+        currentMonday.year,
+        currentMonday.month,
+        currentMonday.day,
+      );
+      final currentWeekEnd = currentWeekStart.add(const Duration(days: 7));
 
-    final schedule = MockData.schedules.where((s) {
-      return s.userId == currentUser.id &&
-          !s.date.isBefore(currentWeekStart) &&
-          s.date.isBefore(currentWeekEnd);
-    }).firstOrNull;
+      final schedules = await SupabaseService.instance.getSchedules();
+      final schedule = schedules.where((s) {
+        return s.userId == widget.currentUser.id &&
+            !s.date.isBefore(currentWeekStart) &&
+            s.date.isBefore(currentWeekEnd);
+      }).firstOrNull;
 
-    if (schedule != null) {
-      _hasSchedule = true;
-      _tasks = MockData.tasksForSchedule(schedule.id);
-    } else {
-      _hasSchedule = false;
-      _tasks = [];
+      if (schedule != null) {
+        final tasks = await SupabaseService.instance.getTasks();
+        if (mounted) {
+          setState(() {
+            _currentSchedule = schedule;
+            _hasSchedule = true;
+            _tasks = tasks;
+            _isLoading = false;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _currentSchedule = null;
+            _hasSchedule = false;
+            _tasks = [];
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al cargar actividades: $e')),
+        );
+      }
     }
   }
 
@@ -71,18 +102,34 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
     );
   }
 
-  void _finalize() {
+  Future<void> _finalize() async {
     final colorScheme = Theme.of(context).colorScheme;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('¡Aseo completado! Gracias por tu colaboración'),
-        backgroundColor: colorScheme.primary,
-      ),
-    );
+    if (_currentSchedule != null) {
+      try {
+        await SupabaseService.instance.updateSchedule(
+          _currentSchedule!.id,
+          isCompleted: true,
+        );
+      } catch (e) {
+        // Ignore errors — still show success message locally
+      }
+    }
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('¡Aseo completado! Gracias por tu colaboración'),
+          backgroundColor: colorScheme.primary,
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -110,11 +157,31 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Actividades de Aseo',
-                style: textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Actividades de Aseo',
+                      style: textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  if (widget.currentUser.isAdmin)
+                    IconButton(
+                      icon: const Icon(Icons.settings),
+                      tooltip: 'Gestionar actividades',
+                      onPressed: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const TaskManagementScreen(),
+                          ),
+                        );
+                        await _loadTasks();
+                      },
+                    ),
+                ],
               ),
               const SizedBox(height: 4),
               Text(
