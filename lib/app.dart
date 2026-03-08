@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_cleanapp/core/theme/app_theme.dart';
+import 'package:flutter_cleanapp/screens/activities_screen.dart';
+import 'package:flutter_cleanapp/screens/calendar_screen.dart';
+import 'package:flutter_cleanapp/screens/home_screen.dart';
 
 /// Root application widget that owns theme state and bottom navigation.
 class CleanApp extends StatefulWidget {
@@ -14,10 +17,10 @@ class _CleanAppState extends State<CleanApp> {
   AppThemeMode _themeMode = AppThemeMode.system;
   int _currentIndex = 0;
 
-  final List<Widget> _screens = const [
-    Center(child: Text('Inicio')),
-    Center(child: Text('Actividades')),
-    Center(child: Text('Calendario')),
+  List<Widget> get _screens => [
+    HomeScreen(onNavigateToActivities: () => setState(() => _currentIndex = 1)),
+    const ActivitiesScreen(),
+    const CalendarScreen(),
   ];
 
   void _toggleTheme() {
@@ -61,7 +64,7 @@ class _CleanAppState extends State<CleanApp> {
             ),
           ],
         ),
-        body: _screens[_currentIndex],
+        body: IndexedStack(index: _currentIndex, children: _screens),
         bottomNavigationBar: NavigationBar(
           selectedIndex: _currentIndex,
           onDestinationSelected: (index) =>
