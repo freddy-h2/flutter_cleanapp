@@ -29,18 +29,36 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
+-- All authenticated users can read all profiles
 CREATE POLICY "Profiles are viewable by authenticated users"
   ON public.profiles FOR SELECT
   TO authenticated
   USING (true);
 
+-- Users can update their own profile
 CREATE POLICY "Users can update own profile"
   ON public.profiles FOR UPDATE
   TO authenticated
   USING (auth.uid() = id);
 
-CREATE POLICY "Admins can manage all profiles"
-  ON public.profiles FOR ALL
+-- Users can insert their own profile (for the signup trigger)
+CREATE POLICY "Users can insert own profile"
+  ON public.profiles FOR INSERT
+  TO authenticated
+  WITH CHECK (auth.uid() = id);
+
+-- Admins can update any profile (e.g. change roles)
+-- NOTE: We use FOR UPDATE (not FOR ALL) to avoid circular RLS on SELECT
+CREATE POLICY "Admins can update all profiles"
+  ON public.profiles FOR UPDATE
+  TO authenticated
+  USING (
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+  );
+
+-- Admins can delete profiles
+CREATE POLICY "Admins can delete profiles"
+  ON public.profiles FOR DELETE
   TO authenticated
   USING (
     EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
@@ -51,7 +69,7 @@ CREATE TRIGGER set_profiles_updated_at
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
 
--- Auto-create profile on signup
+-- Auto-create profile on signup (runs as SECURITY DEFINER, bypasses RLS)
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
 LANGUAGE plpgsql

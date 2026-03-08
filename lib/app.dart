@@ -66,20 +66,12 @@ class _CleanAppState extends State<CleanApp> {
         });
       }
     } catch (e) {
+      debugPrint('Error loading user profile: $e');
       if (mounted) {
         setState(() {
           _isAuthenticated = false;
           _isLoadingUser = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Error al cargar perfil. Intenta de nuevo.'),
-            action: SnackBarAction(
-              label: 'Reintentar',
-              onPressed: _loadCurrentUser,
-            ),
-          ),
-        );
       }
     }
   }
