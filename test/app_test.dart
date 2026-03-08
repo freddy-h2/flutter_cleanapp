@@ -4,15 +4,16 @@ import 'package:flutter_cleanapp/app.dart';
 
 void main() {
   group('CleanApp', () {
-    testWidgets('renders NavigationBar with 3 destinations', (tester) async {
+    testWidgets('renders NavigationBar with 4 destinations', (tester) async {
       await tester.pumpWidget(const CleanApp());
       await tester.pumpAndSettle();
 
       expect(find.byType(NavigationBar), findsOneWidget);
-      expect(find.byType(NavigationDestination), findsNWidgets(3));
+      expect(find.byType(NavigationDestination), findsNWidgets(4));
       expect(find.text('Inicio'), findsOneWidget);
       expect(find.text('Actividades'), findsOneWidget);
       expect(find.text('Calendario'), findsOneWidget);
+      expect(find.text('Comentarios'), findsOneWidget);
     });
 
     testWidgets('switches tabs when NavigationDestination is tapped', (

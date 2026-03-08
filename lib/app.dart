@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_cleanapp/core/theme/app_theme.dart';
 import 'package:flutter_cleanapp/screens/activities_screen.dart';
 import 'package:flutter_cleanapp/screens/calendar_screen.dart';
+import 'package:flutter_cleanapp/screens/comments_screen.dart';
 import 'package:flutter_cleanapp/screens/home_screen.dart';
 
 /// Root application widget that owns theme state and bottom navigation.
@@ -21,6 +22,7 @@ class _CleanAppState extends State<CleanApp> {
     HomeScreen(onNavigateToActivities: () => setState(() => _currentIndex = 1)),
     const ActivitiesScreen(),
     const CalendarScreen(),
+    const CommentsScreen(),
   ];
 
   void _toggleTheme() {
@@ -84,6 +86,11 @@ class _CleanAppState extends State<CleanApp> {
               icon: Icon(Icons.calendar_month_outlined),
               selectedIcon: Icon(Icons.calendar_month),
               label: 'Calendario',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.comment_outlined),
+              selectedIcon: Icon(Icons.comment),
+              label: 'Comentarios',
             ),
           ],
         ),
