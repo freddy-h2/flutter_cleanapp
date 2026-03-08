@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_cleanapp/data/supabase_service.dart';
 import 'package:flutter_cleanapp/models/cleaning_schedule.dart';
+import 'package:flutter_cleanapp/models/extension_request.dart';
 import 'package:flutter_cleanapp/models/user_model.dart';
 import 'package:flutter_cleanapp/screens/admin/user_management_screen.dart';
 
@@ -28,6 +29,15 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
   bool _hasExistingRequest = false;
   bool _isRequestingExtension = false;
+
+  /// Pending incoming extension request where this user is the next_user_id.
+  ExtensionRequest? _incomingRequest;
+
+  /// The user who sent the incoming extension request.
+  UserModel? _requesterUser;
+
+  /// Loading state for accept/reject buttons.
+  bool _isResolvingRequest = false;
 
   @override
   void initState() {
@@ -61,6 +71,9 @@ class _HomeScreenState extends State<HomeScreen> {
       if (currentWeekSchedule != null) {
         await _checkExistingRequest(currentWeekSchedule);
       }
+
+      // Check for an incoming extension request where this user is next_user_id.
+      await _loadIncomingRequest(schedules);
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -83,6 +96,105 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } catch (_) {
       // Non-fatal — leave _hasExistingRequest as false.
+    }
+  }
+
+  /// Loads the incoming extension request (if any) where the current user is
+  /// the next_user_id, and fetches the requester's user info.
+  Future<void> _loadIncomingRequest(List<CleaningSchedule> schedules) async {
+    try {
+      final currentUser = widget.currentUser;
+      final requests = await SupabaseService.instance
+          .getExtensionRequestsForUser(currentUser.id);
+
+      final incoming = requests
+          .where(
+            (r) =>
+                r.status == ExtensionRequestStatus.pending &&
+                r.nextUserId == currentUser.id,
+          )
+          .firstOrNull;
+
+      if (incoming == null) {
+        if (mounted) {
+          setState(() {
+            _incomingRequest = null;
+            _requesterUser = null;
+          });
+        }
+        return;
+      }
+
+      // Try to find the requester in the already-loaded schedules' user list,
+      // otherwise fetch all users.
+      UserModel? requester;
+      final users = await SupabaseService.instance.getUsers();
+      requester = users.where((u) => u.id == incoming.requesterId).firstOrNull;
+
+      if (mounted) {
+        setState(() {
+          _incomingRequest = incoming;
+          _requesterUser = requester;
+        });
+      }
+    } catch (_) {
+      // Non-fatal — leave _incomingRequest as null.
+    }
+  }
+
+  /// Accepts the incoming extension request.
+  Future<void> _acceptRequest() async {
+    setState(() => _isResolvingRequest = true);
+    try {
+      await SupabaseService.instance.acceptExtensionRequest(
+        _incomingRequest!.id,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Prórroga aceptada. Ahora eres el responsable esta semana.',
+            ),
+          ),
+        );
+        await _loadData();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error al aceptar: $e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isResolvingRequest = false);
+      }
+    }
+  }
+
+  /// Rejects the incoming extension request.
+  Future<void> _rejectRequest() async {
+    setState(() => _isResolvingRequest = true);
+    try {
+      await SupabaseService.instance.rejectExtensionRequest(
+        _incomingRequest!.id,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Prórroga rechazada')));
+        setState(() {
+          _incomingRequest = null;
+          _isResolvingRequest = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error al rechazar: $e')));
+        setState(() => _isResolvingRequest = false);
+      }
     }
   }
 
@@ -181,6 +293,59 @@ class _HomeScreenState extends State<HomeScreen> {
     return '$dd/$mm/$yyyy';
   }
 
+  /// Builds the notification banner for an incoming extension request.
+  Widget _buildExtensionBanner() {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Card(
+      color: colorScheme.tertiaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.swap_horiz, color: colorScheme.onTertiaryContainer),
+                const SizedBox(width: 8),
+                Text(
+                  'Solicitud de Prórroga',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: colorScheme.onTertiaryContainer,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '${_requesterUser!.name} (${_requesterUser!.room}) solicita que'
+              ' tomes su turno de aseo esta semana',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onTertiaryContainer,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                FilledButton.icon(
+                  icon: const Icon(Icons.check),
+                  label: const Text('Aceptar'),
+                  onPressed: _isResolvingRequest ? null : _acceptRequest,
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.close),
+                  label: const Text('Rechazar'),
+                  onPressed: _isResolvingRequest ? null : _rejectRequest,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -241,6 +406,10 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
+            if (_incomingRequest != null) ...[
+              _buildExtensionBanner(),
+              const SizedBox(height: 16),
+            ],
             Icon(
               Icons.warning_amber_rounded,
               size: 80,
@@ -309,6 +478,10 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          if (_incomingRequest != null) ...[
+            _buildExtensionBanner(),
+            const SizedBox(height: 16),
+          ],
           Icon(
             Icons.check_circle_outline,
             size: 80,
