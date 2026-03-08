@@ -3,6 +3,7 @@ import 'package:flutter_cleanapp/data/supabase_service.dart';
 import 'package:flutter_cleanapp/models/cleaning_schedule.dart';
 import 'package:flutter_cleanapp/models/extension_request.dart';
 import 'package:flutter_cleanapp/models/user_model.dart';
+import 'package:flutter_cleanapp/screens/admin/extension_requests_screen.dart';
 import 'package:flutter_cleanapp/screens/admin/user_management_screen.dart';
 
 /// Home screen that shows the current user's cleaning status for the week.
@@ -29,6 +30,9 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
   bool _hasExistingRequest = false;
   bool _isRequestingExtension = false;
+
+  /// Number of pending extension requests (admin only).
+  int _pendingExtensionCount = 0;
 
   /// Pending incoming extension request where this user is the next_user_id.
   ExtensionRequest? _incomingRequest;
@@ -74,6 +78,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
       // Check for an incoming extension request where this user is next_user_id.
       await _loadIncomingRequest(schedules);
+
+      // Load pending extension count for admin users.
+      if (widget.currentUser.isAdmin) {
+        try {
+          final pending = await SupabaseService.instance
+              .getPendingExtensionRequests();
+          if (mounted) {
+            setState(() => _pendingExtensionCount = pending.length);
+          }
+        } catch (_) {
+          // Non-fatal — leave _pendingExtensionCount as 0.
+        }
+      }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -377,7 +394,7 @@ class _HomeScreenState extends State<HomeScreen> {
         currentWeekSchedule.userId == currentUser.id &&
         !currentWeekSchedule.isCompleted;
 
-    /// Admin panel card shown only to admin users.
+    /// Admin panel cards shown only to admin users.
     Widget adminCard() => Column(
       children: [
         const SizedBox(height: 16),
@@ -393,6 +410,26 @@ class _HomeScreenState extends State<HomeScreen> {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const UserManagementScreen()),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Card(
+          child: ListTile(
+            leading: Icon(Icons.swap_horiz, color: colorScheme.primary),
+            title: const Text('Gestionar Prórrogas'),
+            subtitle: const Text('Ver y resolver solicitudes de prórroga'),
+            trailing: _pendingExtensionCount > 0
+                ? Badge(
+                    label: Text('$_pendingExtensionCount'),
+                    child: const Icon(Icons.chevron_right),
+                  )
+                : const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const ExtensionRequestsScreen(),
+              ),
             ),
           ),
         ),
