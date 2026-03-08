@@ -15,4 +15,19 @@ class Comment {
     required this.message,
     required this.createdAt,
   });
+
+  factory Comment.fromJson(Map<String, dynamic> json) => Comment(
+    id: json["id"] as String,
+    scheduleId: json["schedule_id"] as String,
+    message: json["message"] as String,
+    createdAt: DateTime.parse(json["created_at"] as String),
+  );
+
+  /// Produces Supabase-compatible JSON.
+  ///
+  /// Excludes [id] and [createdAt] — those are server-generated.
+  Map<String, dynamic> toJson() => {
+    "schedule_id": scheduleId,
+    "message": message,
+  };
 }
