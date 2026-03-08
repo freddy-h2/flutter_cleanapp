@@ -26,6 +26,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   List<CleaningSchedule> _schedules = [];
   bool _isLoading = true;
+  bool _hasExistingRequest = false;
+  bool _isRequestingExtension = false;
 
   @override
   void initState() {
@@ -43,12 +45,125 @@ class _HomeScreenState extends State<HomeScreen> {
           _isLoading = false;
         });
       }
+
+      // Check for an existing pending extension request for the current week.
+      final now = DateTime.now();
+      final thisMonday = _mondayOf(now);
+      CleaningSchedule? currentWeekSchedule;
+      for (final s in schedules) {
+        final weekMonday = _mondayOf(s.date);
+        if (!weekMonday.isBefore(thisMonday) &&
+            !weekMonday.isAfter(thisMonday)) {
+          currentWeekSchedule = s;
+          break;
+        }
+      }
+      if (currentWeekSchedule != null) {
+        await _checkExistingRequest(currentWeekSchedule);
+      }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error al cargar datos: $e')));
+      }
+    }
+  }
+
+  /// Checks whether a pending extension request already exists for [schedule].
+  Future<void> _checkExistingRequest(CleaningSchedule schedule) async {
+    try {
+      final existing = await SupabaseService.instance
+          .getPendingRequestForSchedule(schedule.id);
+      if (mounted) {
+        setState(() {
+          _hasExistingRequest = existing != null;
+        });
+      }
+    } catch (_) {
+      // Non-fatal — leave _hasExistingRequest as false.
+    }
+  }
+
+  /// Sends an extension request for the current week's schedule.
+  Future<void> _requestExtension() async {
+    setState(() => _isRequestingExtension = true);
+
+    try {
+      final currentUser = widget.currentUser;
+      final now = DateTime.now();
+      final thisMonday = _mondayOf(now);
+
+      // Identify the current week's schedule.
+      CleaningSchedule? currentWeekSchedule;
+      for (final s in _schedules) {
+        final weekMonday = _mondayOf(s.date);
+        if (!weekMonday.isBefore(thisMonday) &&
+            !weekMonday.isAfter(thisMonday)) {
+          currentWeekSchedule = s;
+          break;
+        }
+      }
+
+      if (currentWeekSchedule == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'No hay siguiente persona en el calendario para solicitar prórroga',
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
+      // Find the next schedule after the current week where userId differs.
+      CleaningSchedule? nextSchedule;
+      for (final s in _schedules) {
+        if (s.userId != currentUser.id &&
+            s.date.isAfter(currentWeekSchedule.date)) {
+          if (nextSchedule == null || s.date.isBefore(nextSchedule.date)) {
+            nextSchedule = s;
+          }
+        }
+      }
+
+      if (nextSchedule == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'No hay siguiente persona en el calendario para solicitar prórroga',
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
+      await SupabaseService.instance.createExtensionRequest(
+        scheduleId: currentWeekSchedule.id,
+        requesterId: currentUser.id,
+        nextUserId: nextSchedule.userId,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Solicitud de prórroga enviada')),
+        );
+        setState(() => _hasExistingRequest = true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isRequestingExtension = false);
       }
     }
   }
@@ -159,6 +274,16 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: const Icon(Icons.checklist),
               label: const Text('Ir a Actividades'),
               onPressed: widget.onNavigateToActivities,
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.schedule_send),
+              label: Text(
+                _hasExistingRequest ? 'Prórroga solicitada' : 'Pedir Prórroga',
+              ),
+              onPressed: (_hasExistingRequest || _isRequestingExtension)
+                  ? null
+                  : _requestExtension,
             ),
           ],
         ),
