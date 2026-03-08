@@ -2,6 +2,7 @@ import 'package:flutter_cleanapp/core/supabase_config.dart';
 import 'package:flutter_cleanapp/models/cleaning_schedule.dart';
 import 'package:flutter_cleanapp/models/cleaning_task.dart';
 import 'package:flutter_cleanapp/models/comment.dart';
+import 'package:flutter_cleanapp/models/extension_request.dart';
 import 'package:flutter_cleanapp/models/user_model.dart';
 
 /// Singleton service that wraps all Supabase database operations.
@@ -193,5 +194,125 @@ class SupabaseService {
       'schedule_id': scheduleId,
       'message': message,
     });
+  }
+
+  // --- Extension Requests ---
+
+  /// Returns all extension requests where [userId] is the requester or the
+  /// next user, ordered by creation time (newest first).
+  Future<List<ExtensionRequest>> getExtensionRequestsForUser(
+    String userId,
+  ) async {
+    final data = await SupabaseConfig.client
+        .from('extension_requests')
+        .select()
+        .or('requester_id.eq.$userId,next_user_id.eq.$userId')
+        .order('created_at', ascending: false);
+    return data.map((json) => ExtensionRequest.fromJson(json)).toList();
+  }
+
+  /// Returns all extension requests with status 'pending', ordered by
+  /// creation time (newest first).
+  Future<List<ExtensionRequest>> getPendingExtensionRequests() async {
+    final data = await SupabaseConfig.client
+        .from('extension_requests')
+        .select()
+        .eq('status', 'pending')
+        .order('created_at', ascending: false);
+    return data.map((json) => ExtensionRequest.fromJson(json)).toList();
+  }
+
+  /// Returns the pending extension request for [scheduleId], or null if none.
+  Future<ExtensionRequest?> getPendingRequestForSchedule(
+    String scheduleId,
+  ) async {
+    final data = await SupabaseConfig.client
+        .from('extension_requests')
+        .select()
+        .eq('schedule_id', scheduleId)
+        .eq('status', 'pending')
+        .maybeSingle();
+    if (data == null) return null;
+    return ExtensionRequest.fromJson(data);
+  }
+
+  /// Inserts a new extension request (prórroga) with status defaulting to
+  /// 'pending' in the database.
+  Future<void> createExtensionRequest({
+    required String scheduleId,
+    required String requesterId,
+    required String nextUserId,
+  }) async {
+    await SupabaseConfig.client.from('extension_requests').insert({
+      'schedule_id': scheduleId,
+      'requester_id': requesterId,
+      'next_user_id': nextUserId,
+    });
+  }
+
+  /// Accepts the extension request identified by [requestId] and performs the
+  /// schedule user-id swap between the requester and the next user.
+  ///
+  /// If no next schedule exists for [nextUserId] after the current schedule,
+  /// only the current schedule's user is updated to [nextUserId].
+  Future<void> acceptExtensionRequest(String requestId) async {
+    final now = DateTime.now().toIso8601String();
+
+    // Mark the request as accepted.
+    await SupabaseConfig.client
+        .from('extension_requests')
+        .update({'status': 'accepted', 'resolved_at': now})
+        .eq('id', requestId);
+
+    // Fetch the request to get the schedule and user ids.
+    final requestData = await SupabaseConfig.client
+        .from('extension_requests')
+        .select()
+        .eq('id', requestId)
+        .single();
+    final request = ExtensionRequest.fromJson(requestData);
+
+    // Fetch all schedules ordered by date.
+    final schedules = await getSchedules();
+
+    // Find the current schedule (the requester's week).
+    final currentIndex = schedules.indexWhere(
+      (s) => s.id == request.scheduleId,
+    );
+    if (currentIndex == -1) return;
+    final currentSchedule = schedules[currentIndex];
+
+    // Find the next schedule where userId == nextUserId and date is after
+    // the current schedule's date.
+    final nextSchedule = schedules
+        .skip(currentIndex + 1)
+        .where(
+          (s) =>
+              s.userId == request.nextUserId &&
+              s.date.isAfter(currentSchedule.date),
+        )
+        .firstOrNull;
+
+    // Swap user ids (or just update current if no next schedule exists).
+    await SupabaseConfig.client
+        .from('schedules')
+        .update({'user_id': request.nextUserId})
+        .eq('id', currentSchedule.id);
+
+    if (nextSchedule != null) {
+      await SupabaseConfig.client
+          .from('schedules')
+          .update({'user_id': request.requesterId})
+          .eq('id', nextSchedule.id);
+    }
+  }
+
+  /// Rejects the extension request identified by [requestId].
+  Future<void> rejectExtensionRequest(String requestId) async {
+    final now = DateTime.now().toIso8601String();
+    await SupabaseConfig.client
+        .from('extension_requests')
+        .update({'status': 'rejected', 'resolved_at': now})
+        .eq('id', requestId);
   }
 }
