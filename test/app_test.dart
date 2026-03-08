@@ -39,6 +39,16 @@ void main() {
       expect(hasTaskList || hasNoSchedule, isTrue);
     });
 
+    testWidgets('switches to Comentarios tab', (tester) async {
+      await tester.pumpWidget(const CleanApp());
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Comentarios'));
+      await tester.pumpAndSettle();
+      // Verify CommentsScreen content is visible
+      expect(find.text('Enviar'), findsOneWidget);
+      expect(find.text('Recibir'), findsOneWidget);
+    });
+
     testWidgets('theme toggle button exists', (tester) async {
       await tester.pumpWidget(const CleanApp());
       await tester.pumpAndSettle();
