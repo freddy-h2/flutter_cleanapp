@@ -315,4 +315,13 @@ class SupabaseService {
         .update({'status': 'rejected', 'resolved_at': now})
         .eq('id', requestId);
   }
+
+  /// Returns all extension requests ordered by creation time (newest first).
+  Future<List<ExtensionRequest>> getAllExtensionRequests() async {
+    final data = await SupabaseConfig.client
+        .from('extension_requests')
+        .select()
+        .order('created_at', ascending: false);
+    return data.map((json) => ExtensionRequest.fromJson(json)).toList();
+  }
 }

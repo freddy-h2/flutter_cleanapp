@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_cleanapp/data/supabase_service.dart';
 import 'package:flutter_cleanapp/models/cleaning_schedule.dart';
+import 'package:flutter_cleanapp/models/extension_request.dart';
 import 'package:flutter_cleanapp/models/user_model.dart';
 import 'package:flutter_cleanapp/screens/admin/schedule_management_screen.dart';
 
@@ -19,6 +20,7 @@ class CalendarScreen extends StatefulWidget {
 class _CalendarScreenState extends State<CalendarScreen> {
   List<CleaningSchedule> _schedules = [];
   List<UserModel> _users = [];
+  List<ExtensionRequest> _extensionRequests = [];
   bool _isLoading = true;
 
   static const List<String> _monthNames = [
@@ -47,10 +49,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
     try {
       final schedules = await SupabaseService.instance.getSchedules();
       final users = await SupabaseService.instance.getUsers();
+      final requests = widget.currentUser.isAdmin
+          ? await SupabaseService.instance.getAllExtensionRequests()
+          : await SupabaseService.instance.getExtensionRequestsForUser(
+              widget.currentUser.id,
+            );
       if (mounted) {
         setState(() {
           _schedules = schedules;
           _users = users;
+          _extensionRequests = requests;
           _isLoading = false;
         });
       }
@@ -61,6 +69,15 @@ class _CalendarScreenState extends State<CalendarScreen> {
           SnackBar(content: Text('Error al cargar calendario: $e')),
         );
       }
+    }
+  }
+
+  /// Returns the extension request for [scheduleId], or null if none.
+  ExtensionRequest? _getRequestForSchedule(String scheduleId) {
+    try {
+      return _extensionRequests.firstWhere((r) => r.scheduleId == scheduleId);
+    } catch (_) {
+      return null;
     }
   }
 
@@ -168,6 +185,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 final user = entry.user;
                 final currentWeek = _isCurrentWeek(schedule);
                 final currentUser = _isCurrentUser(schedule);
+                final request = _getRequestForSchedule(schedule.id);
 
                 return Card(
                   margin: const EdgeInsets.symmetric(
@@ -194,8 +212,28 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       child: Text(user.name[0]),
                     ),
                     title: Text(user.name),
-                    subtitle: Text(
-                      '${user.room} — Semana del ${_formatDate(schedule.date)}',
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${user.room} — Semana del ${_formatDate(schedule.date)}',
+                        ),
+                        if (request != null && request.isPending)
+                          Chip(
+                            label: const Text('Prórroga pendiente'),
+                            avatar: const Icon(Icons.schedule, size: 16),
+                            visualDensity: VisualDensity.compact,
+                            backgroundColor: colorScheme.tertiaryContainer,
+                          ),
+                        if (request != null &&
+                            request.status == ExtensionRequestStatus.accepted)
+                          Chip(
+                            label: const Text('Prórroga aceptada'),
+                            avatar: const Icon(Icons.swap_horiz, size: 16),
+                            visualDensity: VisualDensity.compact,
+                            backgroundColor: colorScheme.secondaryContainer,
+                          ),
+                      ],
                     ),
                     trailing: schedule.isCompleted
                         ? Icon(Icons.check_circle, color: colorScheme.primary)
