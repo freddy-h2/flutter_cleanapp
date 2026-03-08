@@ -1,23 +1,34 @@
--- Migration: 001_create_tables.sql
--- Description: Create initial database tables for CleanApp
--- Run this in the Supabase SQL editor: https://supabase.com/dashboard/project/qtsymjokdedclwbkunnp/sql
+-- ============================================================
+-- CleanApp — Full database schema (from scratch)
+-- Run this in the Supabase SQL Editor:
+-- https://supabase.com/dashboard/project/qtsymjokdedclwbkunnp/sql
+-- ============================================================
 
 -- ============================================================
--- 1. Profiles table (extends auth.users)
+-- 0. Shared trigger function: auto-update updated_at on UPDATE
+-- ============================================================
+CREATE OR REPLACE FUNCTION public.update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ============================================================
+-- 1. Profiles (extends auth.users)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
-  apartment TEXT NOT NULL,
+  room TEXT NOT NULL,
   role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'admin')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Enable RLS
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
--- Policies: users can read all profiles, update only their own
 CREATE POLICY "Profiles are viewable by authenticated users"
   ON public.profiles FOR SELECT
   TO authenticated
@@ -35,34 +46,44 @@ CREATE POLICY "Admins can manage all profiles"
     EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
   );
 
+CREATE TRIGGER set_profiles_updated_at
+  BEFORE UPDATE ON public.profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION public.update_updated_at_column();
+
 -- Auto-create profile on signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 BEGIN
-  INSERT INTO public.profiles (id, name, apartment, role)
+  INSERT INTO public.profiles (id, name, room, role)
   VALUES (
     NEW.id,
     COALESCE(NEW.raw_user_meta_data->>'name', ''),
-    COALESCE(NEW.raw_user_meta_data->>'apartment', ''),
+    COALESCE(NEW.raw_user_meta_data->>'room', ''),
     COALESCE(NEW.raw_user_meta_data->>'role', 'user')
   );
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 CREATE OR REPLACE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- ============================================================
--- 2. Schedules table
+-- 2. Schedules
 -- ============================================================
 CREATE TABLE IF NOT EXISTS public.schedules (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   date DATE NOT NULL,
   is_completed BOOLEAN NOT NULL DEFAULT false,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 ALTER TABLE public.schedules ENABLE ROW LEVEL SECURITY;
@@ -85,15 +106,21 @@ CREATE POLICY "Users can update own schedule completion"
   USING (user_id = auth.uid())
   WITH CHECK (user_id = auth.uid());
 
+CREATE TRIGGER set_schedules_updated_at
+  BEFORE UPDATE ON public.schedules
+  FOR EACH ROW
+  EXECUTE FUNCTION public.update_updated_at_column();
+
 -- ============================================================
--- 3. Tasks table (defines the checklist items)
+-- 3. Tasks (global checklist items)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS public.tasks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT NOT NULL,
   sort_order INT NOT NULL DEFAULT 0,
   is_active BOOLEAN NOT NULL DEFAULT true,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
@@ -110,7 +137,12 @@ CREATE POLICY "Admins can manage tasks"
     EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
   );
 
--- Insert default 8 cleaning tasks (idempotent via NOT EXISTS check)
+CREATE TRIGGER set_tasks_updated_at
+  BEFORE UPDATE ON public.tasks
+  FOR EACH ROW
+  EXECUTE FUNCTION public.update_updated_at_column();
+
+-- Default cleaning tasks
 INSERT INTO public.tasks (title, sort_order)
 SELECT title, sort_order FROM (VALUES
   ('Lavar los platos', 1),
@@ -125,7 +157,7 @@ SELECT title, sort_order FROM (VALUES
 WHERE NOT EXISTS (SELECT 1 FROM public.tasks LIMIT 1);
 
 -- ============================================================
--- 4. Comments table
+-- 4. Comments (anonymous, linked to a schedule)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS public.comments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -152,3 +184,53 @@ CREATE POLICY "Admins can manage comments"
   USING (
     EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
   );
+
+-- ============================================================
+-- 5. Extension Requests (prórroga system)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.extension_requests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  schedule_id UUID NOT NULL REFERENCES public.schedules(id) ON DELETE CASCADE,
+  requester_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  next_user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  resolved_at TIMESTAMPTZ
+);
+
+ALTER TABLE public.extension_requests ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their own extension requests"
+  ON public.extension_requests FOR SELECT
+  TO authenticated
+  USING (
+    requester_id = auth.uid()
+    OR next_user_id = auth.uid()
+    OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+  );
+
+CREATE POLICY "Users can create extension requests as requester"
+  ON public.extension_requests FOR INSERT
+  TO authenticated
+  WITH CHECK (requester_id = auth.uid());
+
+CREATE POLICY "Next user or admin can update extension requests"
+  ON public.extension_requests FOR UPDATE
+  TO authenticated
+  USING (
+    next_user_id = auth.uid()
+    OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+  );
+
+CREATE POLICY "Only admins can delete extension requests"
+  ON public.extension_requests FOR DELETE
+  TO authenticated
+  USING (
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+  );
+
+CREATE INDEX IF NOT EXISTS idx_extension_requests_schedule_id
+  ON public.extension_requests (schedule_id);
+
+CREATE INDEX IF NOT EXISTS idx_extension_requests_status
+  ON public.extension_requests (status);
