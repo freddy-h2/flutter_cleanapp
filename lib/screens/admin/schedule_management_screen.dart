@@ -56,9 +56,9 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
     }
   }
 
-  String _userApartment(String userId) {
+  String _userRoom(String userId) {
     try {
-      return _users.firstWhere((u) => u.id == userId).apartment;
+      return _users.firstWhere((u) => u.id == userId).room;
     } catch (_) {
       return '';
     }
@@ -92,7 +92,7 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
                         .map(
                           (u) => DropdownMenuItem(
                             value: u,
-                            child: Text('${u.name} — ${u.apartment}'),
+                            child: Text('${u.name} — ${u.room}'),
                           ),
                         )
                         .toList(),
@@ -190,7 +190,7 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
                         .map(
                           (u) => DropdownMenuItem(
                             value: u,
-                            child: Text('${u.name} — ${u.apartment}'),
+                            child: Text('${u.name} — ${u.room}'),
                           ),
                         )
                         .toList(),
@@ -333,7 +333,7 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
                   child: ListTile(
                     title: Text(_userName(schedule.userId)),
                     subtitle: Text(
-                      '${_userApartment(schedule.userId)} · '
+                      '${_userRoom(schedule.userId)} · '
                       '${_formatDate(schedule.date)}',
                     ),
                     trailing: Row(

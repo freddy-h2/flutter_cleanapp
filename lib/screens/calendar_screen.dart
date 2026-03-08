@@ -118,7 +118,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
         }
         final user = _users.firstWhere(
           (u) => u.id == schedule.userId,
-          orElse: () => const UserModel(id: '', name: '?', apartment: ''),
+          orElse: () => const UserModel(id: '', name: '?', room: ''),
         );
         items.add(_ScheduleEntry(schedule: schedule, user: user));
       }
@@ -195,7 +195,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     ),
                     title: Text(user.name),
                     subtitle: Text(
-                      '${user.apartment} — Semana del ${_formatDate(schedule.date)}',
+                      '${user.room} — Semana del ${_formatDate(schedule.date)}',
                     ),
                     trailing: schedule.isCompleted
                         ? Icon(Icons.check_circle, color: colorScheme.primary)

@@ -35,12 +35,10 @@ void main() {
 
       expect(find.text('Crear Cuenta'), findsOneWidget);
       expect(find.byIcon(Icons.person), findsOneWidget);
-      expect(find.byIcon(Icons.apartment), findsOneWidget);
+      expect(find.byIcon(Icons.meeting_room), findsOneWidget);
     });
 
-    testWidgets('register mode shows name and apartment fields', (
-      tester,
-    ) async {
+    testWidgets('register mode shows name and room fields', (tester) async {
       await tester.pumpWidget(const MaterialApp(home: AuthScreen()));
       await tester.pumpAndSettle();
 
@@ -48,9 +46,9 @@ void main() {
       await tester.tap(find.text('Regístrate'));
       await tester.pumpAndSettle();
 
-      // Register mode should show name and apartment fields.
+      // Register mode should show name and room fields.
       expect(find.byIcon(Icons.person), findsOneWidget);
-      expect(find.byIcon(Icons.apartment), findsOneWidget);
+      expect(find.byIcon(Icons.meeting_room), findsOneWidget);
       // Email and password fields still present.
       expect(find.byIcon(Icons.email), findsOneWidget);
       expect(find.byIcon(Icons.lock), findsOneWidget);

@@ -18,7 +18,7 @@ class _AuthScreenState extends State<AuthScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _nameController = TextEditingController();
-  final _apartmentController = TextEditingController();
+  final _roomController = TextEditingController();
   bool _obscurePassword = true;
 
   @override
@@ -26,7 +26,7 @@ class _AuthScreenState extends State<AuthScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _nameController.dispose();
-    _apartmentController.dispose();
+    _roomController.dispose();
     super.dispose();
   }
 
@@ -45,7 +45,7 @@ class _AuthScreenState extends State<AuthScreen> {
           password: _passwordController.text,
           data: {
             'name': _nameController.text.trim(),
-            'apartment': _apartmentController.text.trim(),
+            'room': _roomController.text.trim(),
             'role': 'user',
           },
         );
@@ -137,15 +137,15 @@ class _AuthScreenState extends State<AuthScreen> {
                           ),
                           const SizedBox(height: 12),
                           TextFormField(
-                            controller: _apartmentController,
+                            controller: _roomController,
                             decoration: const InputDecoration(
-                              labelText: 'Departamento',
-                              prefixIcon: Icon(Icons.apartment),
-                              hintText: 'Ej: Depto 3A',
+                              labelText: 'Cuarto',
+                              prefixIcon: Icon(Icons.meeting_room),
+                              hintText: 'Ej: Cuarto 3A',
                             ),
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
-                                return 'Ingresa tu departamento';
+                                return 'Ingresa tu cuarto';
                               }
                               return null;
                             },

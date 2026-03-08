@@ -34,7 +34,8 @@ class _CleanAppState extends State<CleanApp> {
     SupabaseConfig.client.auth.onAuthStateChange.listen((data) {
       final event = data.event;
       if (event == AuthChangeEvent.signedIn ||
-          event == AuthChangeEvent.tokenRefreshed) {
+          event == AuthChangeEvent.tokenRefreshed ||
+          event == AuthChangeEvent.userUpdated) {
         _loadCurrentUser();
       } else if (event == AuthChangeEvent.signedOut) {
         setState(() {
@@ -48,7 +49,7 @@ class _CleanAppState extends State<CleanApp> {
 
   Future<void> _checkAuth() async {
     final session = SupabaseConfig.client.auth.currentSession;
-    if (session != null) {
+    if (session != null && !session.isExpired) {
       await _loadCurrentUser();
     }
   }
@@ -66,7 +67,19 @@ class _CleanAppState extends State<CleanApp> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isLoadingUser = false);
+        setState(() {
+          _isAuthenticated = false;
+          _isLoadingUser = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Error al cargar perfil. Intenta de nuevo.'),
+            action: SnackBarAction(
+              label: 'Reintentar',
+              onPressed: _loadCurrentUser,
+            ),
+          ),
+        );
       }
     }
   }
@@ -106,6 +119,38 @@ class _CleanAppState extends State<CleanApp> {
     AppThemeMode.light => Icons.light_mode,
     AppThemeMode.dark => Icons.dark_mode,
   };
+
+  Widget _buildRetryScreen() {
+    return Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, size: 64, color: Colors.red),
+              const SizedBox(height: 16),
+              const Text(
+                'Error al cargar perfil. Intenta de nuevo.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 24),
+              FilledButton(
+                onPressed: _loadCurrentUser,
+                child: const Text('Reintentar'),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton(
+                onPressed: _logout,
+                child: const Text('Cerrar sesión'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _buildMainShell() {
     return Scaffold(
@@ -166,6 +211,10 @@ class _CleanAppState extends State<CleanApp> {
           ? const Scaffold(body: Center(child: CircularProgressIndicator()))
           : _isAuthenticated && _currentUser != null
           ? _buildMainShell()
+          : !_isAuthenticated &&
+                SupabaseConfig.client.auth.currentSession != null &&
+                !(SupabaseConfig.client.auth.currentSession!.isExpired)
+          ? _buildRetryScreen()
           : const AuthScreen(),
     );
   }

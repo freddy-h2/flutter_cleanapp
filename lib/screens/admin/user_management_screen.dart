@@ -131,7 +131,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                     ),
                     title: Text(user.name),
                     subtitle: Text(
-                      '${user.apartment} — ${user.isAdmin ? "Administrador" : "Usuario"}',
+                      '${user.room} — ${user.isAdmin ? "Administrador" : "Usuario"}',
                     ),
                     trailing: PopupMenuButton<String>(
                       onSelected: (value) => _handleMenuAction(value, user),

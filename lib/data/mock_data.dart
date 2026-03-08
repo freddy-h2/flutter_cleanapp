@@ -12,10 +12,10 @@ abstract final class MockData {
 
   /// All residents in the building.
   static List<UserModel> get users => [
-    const UserModel(id: 'u1', name: 'Carlos García', apartment: 'Depto 1A'),
-    const UserModel(id: 'u2', name: 'María López', apartment: 'Depto 2B'),
-    const UserModel(id: 'u3', name: 'Juan Martínez', apartment: 'Depto 3A'),
-    const UserModel(id: 'u4', name: 'Ana Rodríguez', apartment: 'Depto 4B'),
+    const UserModel(id: 'u1', name: 'Carlos García', room: 'Cuarto 1A'),
+    const UserModel(id: 'u2', name: 'María López', room: 'Cuarto 2B'),
+    const UserModel(id: 'u3', name: 'Juan Martínez', room: 'Cuarto 3A'),
+    const UserModel(id: 'u4', name: 'Ana Rodríguez', room: 'Cuarto 4B'),
   ];
 
   /// Cleaning schedule entries — one per user, rotating weekly.

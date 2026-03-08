@@ -15,7 +15,7 @@ void main() {
       expect(find.byIcon(Icons.lock), findsOneWidget);
       // Register-only fields are NOT shown
       expect(find.byIcon(Icons.person), findsNothing);
-      expect(find.byIcon(Icons.apartment), findsNothing);
+      expect(find.byIcon(Icons.meeting_room), findsNothing);
     });
 
     testWidgets('toggles to register form', (tester) async {
@@ -28,9 +28,9 @@ void main() {
 
       // Register mode shows "Crear Cuenta" title
       expect(find.text('Crear Cuenta'), findsOneWidget);
-      // Name and apartment fields appear
+      // Name and room fields appear
       expect(find.byIcon(Icons.person), findsOneWidget);
-      expect(find.byIcon(Icons.apartment), findsOneWidget);
+      expect(find.byIcon(Icons.meeting_room), findsOneWidget);
     });
 
     testWidgets('validates empty email on submit', (tester) async {

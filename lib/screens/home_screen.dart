@@ -150,7 +150,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: ListTile(
                 leading: const Icon(Icons.person),
                 title: Text(currentUser.name),
-                subtitle: Text(currentUser.apartment),
+                subtitle: Text(currentUser.room),
               ),
             ),
             if (currentUser.isAdmin) adminCard(),
@@ -208,7 +208,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: ListTile(
               leading: const Icon(Icons.person),
               title: Text(currentUser.name),
-              subtitle: Text(currentUser.apartment),
+              subtitle: Text(currentUser.room),
             ),
           ),
           if (currentUser.isAdmin) adminCard(),

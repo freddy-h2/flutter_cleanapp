@@ -16,15 +16,31 @@ class SupabaseService {
   // --- Auth helpers ---
 
   /// Current authenticated user profile, or null if not signed in.
+  ///
+  /// Uses [maybeSingle] so it returns null instead of throwing when no profile
+  /// row exists yet. If the profile is missing but the auth user is present,
+  /// retries up to 3 times with a 1-second delay to handle signup-trigger lag.
   Future<UserModel?> getCurrentUser() async {
     final authUser = SupabaseConfig.client.auth.currentUser;
     if (authUser == null) return null;
-    final data = await SupabaseConfig.client
-        .from('profiles')
-        .select()
-        .eq('id', authUser.id)
-        .single();
-    return UserModel.fromJson(data);
+
+    const maxRetries = 3;
+    for (var attempt = 0; attempt < maxRetries; attempt++) {
+      final data = await SupabaseConfig.client
+          .from('profiles')
+          .select()
+          .eq('id', authUser.id)
+          .maybeSingle();
+      if (data != null) {
+        return UserModel.fromJson(data);
+      }
+      // Profile row not yet created (signup trigger may still be running).
+      // Wait 1 second before retrying, unless this was the last attempt.
+      if (attempt < maxRetries - 1) {
+        await Future<void>.delayed(const Duration(seconds: 1));
+      }
+    }
+    return null;
   }
 
   // --- Profiles ---

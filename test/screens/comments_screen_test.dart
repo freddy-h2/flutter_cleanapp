@@ -6,7 +6,7 @@ import 'package:flutter_cleanapp/screens/comments_screen.dart';
 const _testUser = UserModel(
   id: 'test-id',
   name: 'Test User',
-  apartment: 'Depto 1A',
+  room: 'Cuarto 1A',
 );
 
 void main() {

@@ -51,7 +51,7 @@ class _CommentsScreenState extends State<CommentsScreen>
         final users = await SupabaseService.instance.getUsers();
         responsible = users.firstWhere(
           (u) => u.id == schedule.userId,
-          orElse: () => const UserModel(id: '', name: '?', apartment: ''),
+          orElse: () => const UserModel(id: '', name: '?', room: ''),
         );
 
         // Load comments if current user is the responsible one
@@ -170,7 +170,7 @@ class _CommentsScreenState extends State<CommentsScreen>
                     leading: const CircleAvatar(child: Icon(Icons.person)),
                     title: const Text('Responsable actual'),
                     subtitle: Text(
-                      '${_responsible!.name} — ${_responsible!.apartment}',
+                      '${_responsible!.name} — ${_responsible!.room}',
                     ),
                   )
                 : const Padding(

@@ -6,13 +6,13 @@ import 'package:flutter_cleanapp/screens/activities_screen.dart';
 const _testUser = UserModel(
   id: 'test-id',
   name: 'Test User',
-  apartment: 'Depto 1A',
+  room: 'Cuarto 1A',
 );
 
 const _testAdmin = UserModel(
   id: 'admin-id',
   name: 'Admin User',
-  apartment: 'Depto 0A',
+  room: 'Cuarto 0A',
   role: UserRole.admin,
 );
 
