@@ -1,64 +1,59 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_cleanapp/screens/auth_screen.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_cleanapp/app.dart';
 
 void main() {
-  group('CleanApp', () {
-    testWidgets('renders NavigationBar with 4 destinations', (tester) async {
-      await tester.pumpWidget(const CleanApp());
-      await tester.pumpAndSettle();
-
-      expect(find.byType(NavigationBar), findsOneWidget);
-      expect(find.byType(NavigationDestination), findsNWidgets(4));
-      expect(find.text('Inicio'), findsOneWidget);
-      expect(find.text('Actividades'), findsOneWidget);
-      expect(find.text('Calendario'), findsOneWidget);
-      expect(find.text('Comentarios'), findsOneWidget);
-    });
-
-    testWidgets('switches tabs when NavigationDestination is tapped', (
+  // CleanApp requires Supabase to be initialized (for auth state listening).
+  // In unit tests we test the AuthScreen directly, which is what CleanApp
+  // shows when the user is not authenticated.
+  group('AuthScreen (shown by CleanApp when logged out)', () {
+    testWidgets('renders login form with Iniciar Sesión button', (
       tester,
     ) async {
-      await tester.pumpWidget(const CleanApp());
+      await tester.pumpWidget(const MaterialApp(home: AuthScreen()));
       await tester.pumpAndSettle();
 
-      // Tap the Actividades destination.
-      await tester.tap(find.text('Actividades'));
-      await tester.pumpAndSettle();
-
-      // The Activities screen content should be visible — either the task list
-      // header (when user has duty) or the no-schedule message.
-      final hasTaskList = find
-          .text('Actividades de Aseo')
-          .evaluate()
-          .isNotEmpty;
-      final hasNoSchedule = find
-          .text('No tienes aseo asignado esta semana')
-          .evaluate()
-          .isNotEmpty;
-      expect(hasTaskList || hasNoSchedule, isTrue);
+      expect(find.text('Iniciar Sesión'), findsWidgets);
+      expect(find.text('CleanApp'), findsOneWidget);
     });
 
-    testWidgets('switches to Comentarios tab', (tester) async {
-      await tester.pumpWidget(const CleanApp());
+    testWidgets('shows email and password fields', (tester) async {
+      await tester.pumpWidget(const MaterialApp(home: AuthScreen()));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Comentarios'));
-      await tester.pumpAndSettle();
-      // Verify CommentsScreen content is visible
-      expect(find.text('Enviar'), findsOneWidget);
-      expect(find.text('Recibir'), findsOneWidget);
+
+      expect(find.byIcon(Icons.email), findsOneWidget);
+      expect(find.byIcon(Icons.lock), findsOneWidget);
     });
 
-    testWidgets('theme toggle button exists', (tester) async {
-      await tester.pumpWidget(const CleanApp());
+    testWidgets('toggles to register mode', (tester) async {
+      await tester.pumpWidget(const MaterialApp(home: AuthScreen()));
       await tester.pumpAndSettle();
 
-      expect(
-        find.byWidgetPredicate(
-          (widget) => widget is IconButton && widget.tooltip == 'Cambiar tema',
-        ),
-        findsOneWidget,
-      );
+      // Tap the "Regístrate" TextButton to switch to register mode.
+      await tester.tap(find.text('Regístrate'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Crear Cuenta'), findsOneWidget);
+      expect(find.byIcon(Icons.person), findsOneWidget);
+      expect(find.byIcon(Icons.apartment), findsOneWidget);
+    });
+
+    testWidgets('register mode shows name and apartment fields', (
+      tester,
+    ) async {
+      await tester.pumpWidget(const MaterialApp(home: AuthScreen()));
+      await tester.pumpAndSettle();
+
+      // Switch to register mode.
+      await tester.tap(find.text('Regístrate'));
+      await tester.pumpAndSettle();
+
+      // Register mode should show name and apartment fields.
+      expect(find.byIcon(Icons.person), findsOneWidget);
+      expect(find.byIcon(Icons.apartment), findsOneWidget);
+      // Email and password fields still present.
+      expect(find.byIcon(Icons.email), findsOneWidget);
+      expect(find.byIcon(Icons.lock), findsOneWidget);
     });
   });
 }
