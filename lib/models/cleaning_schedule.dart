@@ -5,11 +5,15 @@ class CleaningSchedule {
   final DateTime date;
   final bool isCompleted;
 
+  /// Server-managed timestamp; nullable for backward compatibility.
+  final DateTime? updatedAt;
+
   const CleaningSchedule({
     required this.id,
     required this.userId,
     required this.date,
     this.isCompleted = false,
+    this.updatedAt,
   });
 
   factory CleaningSchedule.fromJson(Map<String, dynamic> json) =>
@@ -18,6 +22,9 @@ class CleaningSchedule {
         userId: json["user_id"] as String,
         date: DateTime.parse(json["date"] as String),
         isCompleted: json["is_completed"] as bool? ?? false,
+        updatedAt: json["updated_at"] == null
+            ? null
+            : DateTime.parse(json["updated_at"] as String),
       );
 
   Map<String, dynamic> toJson() => {
@@ -36,5 +43,6 @@ class CleaningSchedule {
     userId: userId ?? this.userId,
     date: date ?? this.date,
     isCompleted: isCompleted ?? this.isCompleted,
+    updatedAt: updatedAt,
   );
 }

@@ -13,6 +13,9 @@ class CleaningTask {
   /// Tasks are now global checklist items, not per-schedule.
   final String scheduleId;
 
+  /// Server-managed timestamp; nullable for backward compatibility.
+  final DateTime? updatedAt;
+
   const CleaningTask({
     required this.id,
     required this.title,
@@ -20,6 +23,7 @@ class CleaningTask {
     this.isActive = true,
     this.isCompleted = false,
     this.scheduleId = '',
+    this.updatedAt,
   });
 
   factory CleaningTask.fromJson(Map<String, dynamic> json) => CleaningTask(
@@ -27,6 +31,9 @@ class CleaningTask {
     title: json["title"] as String,
     sortOrder: json["sort_order"] as int? ?? 0,
     isActive: json["is_active"] as bool? ?? true,
+    updatedAt: json["updated_at"] == null
+        ? null
+        : DateTime.parse(json["updated_at"] as String),
   );
 
   Map<String, dynamic> toJson() => {
@@ -48,5 +55,6 @@ class CleaningTask {
     sortOrder: sortOrder ?? this.sortOrder,
     isActive: isActive ?? this.isActive,
     isCompleted: isCompleted ?? this.isCompleted,
+    updatedAt: updatedAt,
   );
 }
