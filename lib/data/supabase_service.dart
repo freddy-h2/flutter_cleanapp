@@ -397,11 +397,51 @@ class SupabaseService {
     });
   }
 
+  /// Returns all consecutive schedules with the same [userId] around [anchor].
+  ///
+  /// [sortedSchedules] must be sorted by date ascending. Walks backward and
+  /// forward from [anchor] collecting schedules that belong to the same user
+  /// and are consecutive (date difference ≤ 1 day).
+  List<CleaningSchedule> _findPeriodSchedules(
+    List<CleaningSchedule> sortedSchedules,
+    CleaningSchedule anchor,
+  ) {
+    final anchorIndex = sortedSchedules.indexWhere((s) => s.id == anchor.id);
+    if (anchorIndex == -1) return [anchor];
+
+    final userId = anchor.userId;
+    final result = <CleaningSchedule>[anchor];
+
+    // Walk backward.
+    for (var i = anchorIndex - 1; i >= 0; i--) {
+      if (sortedSchedules[i].userId != userId) break;
+      final diff = sortedSchedules[i + 1].date
+          .difference(sortedSchedules[i].date)
+          .inDays;
+      if (diff > 1) break;
+      result.insert(0, sortedSchedules[i]);
+    }
+
+    // Walk forward.
+    for (var i = anchorIndex + 1; i < sortedSchedules.length; i++) {
+      if (sortedSchedules[i].userId != userId) break;
+      final diff = sortedSchedules[i].date
+          .difference(sortedSchedules[i - 1].date)
+          .inDays;
+      if (diff > 1) break;
+      result.add(sortedSchedules[i]);
+    }
+
+    return result;
+  }
+
   /// Accepts the extension request identified by [requestId] and performs the
   /// schedule user-id swap between the requester and the next user.
   ///
-  /// If no next schedule exists for [nextUserId] after the current schedule,
-  /// only the current schedule's user is updated to [nextUserId].
+  /// Swaps ALL schedule rows in the requester's full cleaning period with ALL
+  /// schedule rows in the next user's full cleaning period. If the next user
+  /// has no period after the requester's, only the requester's period is
+  /// swapped.
   Future<void> acceptExtensionRequest(String requestId) async {
     final now = DateTime.now().toIso8601String();
 
@@ -422,35 +462,42 @@ class SupabaseService {
     // Fetch all schedules ordered by date.
     final schedules = await getSchedules();
 
-    // Find the current schedule (the requester's week).
-    final currentIndex = schedules.indexWhere(
-      (s) => s.id == request.scheduleId,
-    );
-    if (currentIndex == -1) return;
-    final currentSchedule = schedules[currentIndex];
+    // Find the anchor schedule (the one referenced by the request).
+    final anchorIndex = schedules.indexWhere((s) => s.id == request.scheduleId);
+    if (anchorIndex == -1) return;
+    final anchor = schedules[anchorIndex];
 
-    // Find the next schedule where userId == nextUserId and date is after
-    // the current schedule's date.
-    final nextSchedule = schedules
-        .skip(currentIndex + 1)
-        .where(
-          (s) =>
-              s.userId == request.nextUserId &&
-              s.date.isAfter(currentSchedule.date),
-        )
-        .firstOrNull;
+    // Find the requester's full period around the anchor.
+    final requesterPeriod = _findPeriodSchedules(schedules, anchor);
 
-    // Swap user ids (or just update current if no next schedule exists).
-    await SupabaseConfig.client
-        .from('schedules')
-        .update({'user_id': request.nextUserId})
-        .eq('id', currentSchedule.id);
+    // Find the next user's period — first consecutive group after requester's
+    // period end date.
+    final periodEndDate = requesterPeriod.last.date;
+    CleaningSchedule? nextAnchor;
+    for (final s in schedules) {
+      if (s.userId == request.nextUserId && s.date.isAfter(periodEndDate)) {
+        nextAnchor = s;
+        break;
+      }
+    }
 
-    if (nextSchedule != null) {
+    // Swap requester's period: set all rows to nextUserId.
+    for (final s in requesterPeriod) {
       await SupabaseConfig.client
           .from('schedules')
-          .update({'user_id': request.requesterId})
-          .eq('id', nextSchedule.id);
+          .update({'user_id': request.nextUserId})
+          .eq('id', s.id);
+    }
+
+    // Swap next user's period: set all rows to requesterId.
+    if (nextAnchor != null) {
+      final nextUserPeriod = _findPeriodSchedules(schedules, nextAnchor);
+      for (final s in nextUserPeriod) {
+        await SupabaseConfig.client
+            .from('schedules')
+            .update({'user_id': request.requesterId})
+            .eq('id', s.id);
+      }
     }
   }
 
