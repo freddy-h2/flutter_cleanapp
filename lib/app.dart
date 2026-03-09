@@ -359,10 +359,20 @@ class _LimpyAppState extends State<LimpyApp> {
   Widget _buildMainShell() {
     return Scaffold(
       appBar: CupertinoNavigationBar(
-        middle: Text(_currentTitle),
+        middle: Text(
+          _currentTitle,
+          style: Theme.of(context).brightness == Brightness.dark
+              ? const TextStyle(color: Colors.white)
+              : null,
+        ),
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,
-          child: const Icon(CupertinoIcons.bell),
+          child: Icon(
+            CupertinoIcons.bell,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white
+                : null,
+          ),
           onPressed: () {
             _navigatorKey.currentState?.push(
               CupertinoPageRoute(builder: (_) => const NotificationsScreen()),
@@ -370,7 +380,7 @@ class _LimpyAppState extends State<LimpyApp> {
           },
         ),
         backgroundColor: Theme.of(context).brightness == Brightness.dark
-            ? const Color(0xFF1C1C1E).withValues(alpha: 0.7)
+            ? const Color(0xFF121212).withValues(alpha: 0.94)
             : Theme.of(context).colorScheme.surface.withValues(alpha: 0.85),
         brightness: Theme.of(context).brightness == Brightness.dark
             ? Brightness.dark
@@ -403,7 +413,7 @@ class _LimpyAppState extends State<LimpyApp> {
               onTap: (index) => setState(() => _currentIndex = index),
               activeColor: CupertinoColors.activeBlue,
               backgroundColor: Theme.of(context).brightness == Brightness.dark
-                  ? const Color(0xFF1C1C1E).withValues(alpha: 0.7)
+                  ? const Color(0xFF121212).withValues(alpha: 0.94)
                   : Theme.of(
                       context,
                     ).colorScheme.surface.withValues(alpha: 0.7),
