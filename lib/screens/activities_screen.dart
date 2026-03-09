@@ -28,6 +28,7 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
 
   late final StreamSubscription<void> _tasksRealtimeSub;
   late final StreamSubscription<void> _schedulesRealtimeSub;
+  late final StreamSubscription<void> _extensionsRealtimeSub;
 
   @override
   void initState() {
@@ -45,12 +46,19 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
         _loadTasks();
       }
     });
+    _extensionsRealtimeSub = RealtimeService.instance.onExtensionsChanged
+        .listen((_) {
+          if (mounted) {
+            _loadTasks();
+          }
+        });
   }
 
   @override
   void dispose() {
     _tasksRealtimeSub.cancel();
     _schedulesRealtimeSub.cancel();
+    _extensionsRealtimeSub.cancel();
     super.dispose();
   }
 
