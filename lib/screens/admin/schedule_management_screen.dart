@@ -124,6 +124,12 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Se crearán 3 días consecutivos de aseo a partir de la '
+                    'fecha seleccionada',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
                 ],
               ),
               actions: [
@@ -137,13 +143,20 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
                       : () async {
                           Navigator.pop(ctx);
                           try {
-                            await SupabaseService.instance.createSchedule(
-                              CleaningSchedule(
-                                id: '',
-                                userId: selectedUser!.id,
-                                date: selectedDate,
-                              ),
-                            );
+                            for (
+                              var i = 0;
+                              i < SupabaseService.cleaningPeriodDays;
+                              i++
+                            ) {
+                              final date = selectedDate.add(Duration(days: i));
+                              await SupabaseService.instance.createSchedule(
+                                CleaningSchedule(
+                                  id: '',
+                                  userId: selectedUser!.id,
+                                  date: date,
+                                ),
+                              );
+                            }
                             await _loadData();
                           } catch (e) {
                             if (mounted) {

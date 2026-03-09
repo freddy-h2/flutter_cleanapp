@@ -365,11 +365,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  /// Returns the Monday of the week containing [date].
-  DateTime _mondayOf(DateTime date) {
-    return DateTime(date.year, date.month, date.day - (date.weekday - 1));
-  }
-
   /// Formats a [DateTime] as "dd/MM/yyyy".
   String _formatDate(DateTime date) {
     final dd = date.day.toString().padLeft(2, '0');
@@ -539,7 +534,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Semana del ${_formatDate(thisMonday)} al ${_formatDate(thisSunday)}',
+              'Periodo de aseo: ${_formatDate(displayPeriodStart)} - ${_formatDate(displayPeriodEnd)}',
               style: textTheme.bodyLarge,
               textAlign: TextAlign.center,
             ),
@@ -573,10 +568,10 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    // State B — user is free this week; find next turn.
+    // State B — user is free this period; find next turn.
     CleaningSchedule? nextSchedule;
     for (final s in _schedules) {
-      if (s.userId == currentUser.id && s.date.isAfter(now)) {
+      if (s.userId == currentUser.id && s.date.isAfter(today)) {
         if (nextSchedule == null || s.date.isBefore(nextSchedule.date)) {
           nextSchedule = s;
         }
@@ -584,7 +579,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     final String nextDateText = nextSchedule != null
-        ? _formatDate(_mondayOf(nextSchedule.date))
+        ? _formatDate(nextSchedule.date)
         : '—';
 
     return SingleChildScrollView(
@@ -611,7 +606,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Tu próximo turno es la semana del $nextDateText',
+            'Tu próximo turno inicia el $nextDateText',
             style: textTheme.bodyLarge,
             textAlign: TextAlign.center,
           ),

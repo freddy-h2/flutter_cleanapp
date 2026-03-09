@@ -107,17 +107,21 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
   }
 
-  /// Returns true if [schedule.date] falls within the current Monday–Sunday.
-  bool _isCurrentWeek(CleaningSchedule schedule) {
+  /// Returns true if [schedule.date] falls within the current 3-day period.
+  ///
+  /// The current period spans from [today - (cleaningPeriodDays - 1)] to today.
+  bool _isCurrentPeriod(CleaningSchedule schedule) {
     final now = DateTime.now();
-    final currentMonday = DateTime(
-      now.year,
-      now.month,
-      now.day - (now.weekday - 1),
+    final today = DateTime(now.year, now.month, now.day);
+    final periodStart = today.subtract(
+      const Duration(days: SupabaseService.cleaningPeriodDays - 1),
     );
-    final currentSunday = currentMonday.add(const Duration(days: 6));
-    final d = schedule.date;
-    return !d.isBefore(currentMonday) && !d.isAfter(currentSunday);
+    final d = DateTime(
+      schedule.date.year,
+      schedule.date.month,
+      schedule.date.day,
+    );
+    return !d.isBefore(periodStart) && !d.isAfter(today);
   }
 
   /// Returns [date] formatted as "dd/MM/yyyy".
@@ -209,7 +213,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 final entry = item as _ScheduleEntry;
                 final schedule = entry.schedule;
                 final user = entry.user;
-                final currentWeek = _isCurrentWeek(schedule);
+                final currentWeek = _isCurrentPeriod(schedule);
                 final currentUser = _isCurrentUser(schedule);
                 final request = _getRequestForSchedule(schedule.id);
 
@@ -242,7 +246,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '${user.room} — Semana del ${_formatDate(schedule.date)}',
+                          '${user.room} — Periodo del ${_formatDate(schedule.date)}',
                         ),
                         if (request != null && request.isPending)
                           Chip(
@@ -265,7 +269,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         ? Icon(Icons.check_circle, color: colorScheme.primary)
                         : currentWeek
                         ? Chip(
-                            label: const Text('Esta semana'),
+                            label: const Text('Este periodo'),
                             backgroundColor: colorScheme.primaryContainer,
                           )
                         : null,

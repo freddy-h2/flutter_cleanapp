@@ -86,6 +86,9 @@ class SupabaseService {
 
   // --- Schedules ---
 
+  /// Number of days in a cleaning period.
+  static const int cleaningPeriodDays = 3;
+
   /// Returns all cleaning schedules ordered by date.
   Future<List<CleaningSchedule>> getSchedules() async {
     final data = await SupabaseConfig.client
@@ -95,7 +98,27 @@ class SupabaseService {
     return data.map((json) => CleaningSchedule.fromJson(json)).toList();
   }
 
+  /// Returns schedules within the current 3-day cleaning period window.
+  ///
+  /// A schedule is considered "current" if its date falls within the window
+  /// [today - (cleaningPeriodDays - 1), today].
+  Future<List<CleaningSchedule>> getCurrentPeriodSchedules() async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final periodStart = today.subtract(Duration(days: cleaningPeriodDays - 1));
+    final tomorrow = today.add(const Duration(days: 1));
+    final data = await SupabaseConfig.client
+        .from('schedules')
+        .select()
+        .gte('date', periodStart.toIso8601String().split('T').first)
+        .lt('date', tomorrow.toIso8601String().split('T').first)
+        .order('date');
+    return data.map((json) => CleaningSchedule.fromJson(json)).toList();
+  }
+
   /// Returns the schedule for the current calendar week, or null if none.
+  ///
+  /// Deprecated: prefer [getCurrentPeriodSchedules] for 3-day period logic.
   Future<CleaningSchedule?> getCurrentWeekSchedule() async {
     final now = DateTime.now();
     final monday = now.subtract(Duration(days: now.weekday - 1));
