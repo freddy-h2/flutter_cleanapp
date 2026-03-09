@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_cleanapp/core/notification_service.dart';
 import 'package:flutter_cleanapp/core/realtime_service.dart';
@@ -330,7 +331,9 @@ class _HomeScreenState extends State<HomeScreen> {
             Row(
               children: [
                 Icon(
-                  isUpdate ? Icons.system_update : Icons.campaign,
+                  isUpdate
+                      ? CupertinoIcons.arrow_down_circle_fill
+                      : CupertinoIcons.speaker_fill,
                   color: isUpdate
                       ? colorScheme.onPrimaryContainer
                       : colorScheme.onSecondaryContainer,
@@ -348,7 +351,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, size: 18),
+                  icon: const Icon(CupertinoIcons.xmark, size: 18),
                   onPressed: () {
                     setState(() {
                       _dismissedAnnouncementIds.add(announcement.id);
@@ -370,7 +373,7 @@ class _HomeScreenState extends State<HomeScreen> {
             if (isUpdate && announcement.link != null) ...[
               const SizedBox(height: 12),
               FilledButton.icon(
-                icon: const Icon(Icons.download),
+                icon: const Icon(CupertinoIcons.arrow_down_to_line),
                 label: const Text('Descargar actualización'),
                 onPressed: () => _openLink(announcement.link!),
               ),
@@ -800,7 +803,10 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Row(
               children: [
-                Icon(Icons.swap_horiz, color: colorScheme.onTertiaryContainer),
+                Icon(
+                  CupertinoIcons.repeat,
+                  color: colorScheme.onTertiaryContainer,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   'Solicitud de Prórroga',
@@ -823,13 +829,13 @@ class _HomeScreenState extends State<HomeScreen> {
             Row(
               children: [
                 FilledButton.icon(
-                  icon: const Icon(Icons.check),
+                  icon: const Icon(CupertinoIcons.checkmark),
                   label: const Text('Aceptar'),
                   onPressed: _isResolvingRequest ? null : _acceptRequest,
                 ),
                 const SizedBox(width: 8),
                 OutlinedButton.icon(
-                  icon: const Icon(Icons.close),
+                  icon: const Icon(CupertinoIcons.xmark),
                   label: const Text('Rechazar'),
                   onPressed: _isResolvingRequest ? null : _rejectRequest,
                 ),
@@ -888,12 +894,12 @@ class _HomeScreenState extends State<HomeScreen> {
         Card(
           child: ListTile(
             leading: Icon(
-              Icons.admin_panel_settings,
+              CupertinoIcons.person_crop_circle_badge_checkmark,
               color: colorScheme.primary,
             ),
             title: const Text('Panel de Administración'),
             subtitle: const Text('Gestionar usuarios del edificio'),
-            trailing: const Icon(Icons.chevron_right),
+            trailing: const Icon(CupertinoIcons.chevron_right),
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const UserManagementScreen()),
@@ -903,15 +909,15 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(height: 8),
         Card(
           child: ListTile(
-            leading: Icon(Icons.swap_horiz, color: colorScheme.primary),
+            leading: Icon(CupertinoIcons.repeat, color: colorScheme.primary),
             title: const Text('Gestionar Prórrogas'),
             subtitle: const Text('Ver y resolver solicitudes de prórroga'),
             trailing: _pendingExtensionCount > 0
                 ? Badge(
                     label: Text('$_pendingExtensionCount'),
-                    child: const Icon(Icons.chevron_right),
+                    child: const Icon(CupertinoIcons.chevron_right),
                   )
-                : const Icon(Icons.chevron_right),
+                : const Icon(CupertinoIcons.chevron_right),
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -940,7 +946,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 16),
             ],
             Icon(
-              Icons.warning_amber_rounded,
+              CupertinoIcons.exclamationmark_triangle,
               size: 80,
               color: colorScheme.error,
             ),
@@ -961,7 +967,7 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 24),
             Card(
               child: ListTile(
-                leading: const Icon(Icons.person),
+                leading: const Icon(CupertinoIcons.person),
                 title: Text(currentUser.name),
                 subtitle: Text(currentUser.room),
               ),
@@ -969,14 +975,14 @@ class _HomeScreenState extends State<HomeScreen> {
             if (currentUser.isAdmin) adminCard(),
             const SizedBox(height: 24),
             FilledButton.icon(
-              icon: const Icon(Icons.checklist),
+              icon: const Icon(CupertinoIcons.checkmark_square),
               label: const Text('Ir a Actividades'),
               onPressed: widget.onNavigateToActivities,
             ),
             const SizedBox(height: 12),
             if (_hasExistingRequest) ...[
               OutlinedButton.icon(
-                icon: const Icon(Icons.cancel_outlined),
+                icon: const Icon(CupertinoIcons.xmark),
                 label: const Text('Cancelar Prórroga'),
                 onPressed: _isRequestingExtension ? null : _cancelExtension,
                 style: OutlinedButton.styleFrom(
@@ -985,7 +991,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ] else if (_hasExceededProrrogaLimit) ...[
               OutlinedButton.icon(
-                icon: const Icon(Icons.schedule_send),
+                icon: const Icon(CupertinoIcons.clock),
                 label: const Text('Pedir Prórroga'),
                 onPressed: null,
               ),
@@ -997,7 +1003,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ] else ...[
               OutlinedButton.icon(
-                icon: const Icon(Icons.schedule_send),
+                icon: const Icon(CupertinoIcons.clock),
                 label: const Text('Pedir Prórroga'),
                 onPressed: _isRequestingExtension
                     ? null
@@ -1038,7 +1044,7 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 16),
           ],
           Icon(
-            Icons.check_circle_outline,
+            CupertinoIcons.checkmark_circle,
             size: 80,
             color: colorScheme.primary,
           ),
@@ -1059,7 +1065,7 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 24),
           Card(
             child: ListTile(
-              leading: const Icon(Icons.person),
+              leading: const Icon(CupertinoIcons.person),
               title: Text(currentUser.name),
               subtitle: Text(currentUser.room),
             ),

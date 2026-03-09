@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_cleanapp/core/supabase_config.dart';
 import 'package:flutter_cleanapp/data/supabase_service.dart';
@@ -250,7 +251,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               initialValue: SupabaseConfig.client.auth.currentUser?.email ?? '',
               decoration: const InputDecoration(
                 labelText: 'Correo electronico',
-                prefixIcon: Icon(Icons.email),
+                prefixIcon: Icon(CupertinoIcons.mail),
               ),
               readOnly: true,
               enabled: false,
@@ -261,7 +262,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               controller: _nameController,
               decoration: const InputDecoration(
                 labelText: 'Nombre completo',
-                prefixIcon: Icon(Icons.person),
+                prefixIcon: Icon(CupertinoIcons.person),
               ),
               validator: (v) =>
                   (v == null || v.trim().isEmpty) ? 'Ingresa tu nombre' : null,
@@ -272,7 +273,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               controller: _roomController,
               decoration: const InputDecoration(
                 labelText: 'Cuarto',
-                prefixIcon: Icon(Icons.meeting_room),
+                prefixIcon: Icon(CupertinoIcons.house),
                 hintText: 'Ej: Cuarto 3A',
               ),
               validator: (v) =>
@@ -314,12 +315,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       obscureText: _obscureCurrentPassword,
                       decoration: InputDecoration(
                         labelText: 'Contraseña actual',
-                        prefixIcon: const Icon(Icons.lock_outline),
+                        prefixIcon: const Icon(CupertinoIcons.lock),
                         suffixIcon: IconButton(
                           icon: Icon(
                             _obscureCurrentPassword
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
+                                ? CupertinoIcons.eye
+                                : CupertinoIcons.eye_slash,
                           ),
                           onPressed: () => setState(
                             () => _obscureCurrentPassword =
@@ -335,12 +336,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       obscureText: _obscureNewPassword,
                       decoration: InputDecoration(
                         labelText: 'Nueva contraseña',
-                        prefixIcon: const Icon(Icons.lock),
+                        prefixIcon: const Icon(CupertinoIcons.lock_fill),
                         suffixIcon: IconButton(
                           icon: Icon(
                             _obscureNewPassword
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
+                                ? CupertinoIcons.eye
+                                : CupertinoIcons.eye_slash,
                           ),
                           onPressed: () => setState(
                             () => _obscureNewPassword = !_obscureNewPassword,
@@ -355,12 +356,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       obscureText: _obscureConfirmPassword,
                       decoration: InputDecoration(
                         labelText: 'Confirmar nueva contraseña',
-                        prefixIcon: const Icon(Icons.lock),
+                        prefixIcon: const Icon(CupertinoIcons.lock_fill),
                         suffixIcon: IconButton(
                           icon: Icon(
                             _obscureConfirmPassword
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
+                                ? CupertinoIcons.eye
+                                : CupertinoIcons.eye_slash,
                           ),
                           onPressed: () => setState(
                             () => _obscureConfirmPassword =
@@ -412,7 +413,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       keyboardType: TextInputType.emailAddress,
                       decoration: const InputDecoration(
                         labelText: 'Nuevo correo electrónico',
-                        prefixIcon: Icon(Icons.email_outlined),
+                        prefixIcon: Icon(CupertinoIcons.mail),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -459,7 +460,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             // Feedback
             Card(
               child: ListTile(
-                leading: const Icon(Icons.feedback_outlined),
+                leading: const Icon(CupertinoIcons.chat_bubble),
                 title: const Text('Comentario sobre la App'),
                 subtitle: const Text('Envía un comentario anónimo'),
                 onTap: widget.onSendFeedback,
@@ -471,7 +472,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             if (widget.currentUser.isAdmin) ...[
               Card(
                 child: ListTile(
-                  leading: const Icon(Icons.campaign_outlined),
+                  leading: const Icon(CupertinoIcons.speaker),
                   title: const Text('Gestionar Comunicados'),
                   subtitle: const Text('Administrar avisos y actualizaciones'),
                   onTap: () => Navigator.push(
@@ -490,7 +491,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               height: 48,
               child: OutlinedButton.icon(
                 icon: Icon(
-                  Icons.logout,
+                  CupertinoIcons.square_arrow_right,
                   color: Theme.of(context).colorScheme.error,
                 ),
                 label: Text(
