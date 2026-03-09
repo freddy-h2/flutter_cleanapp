@@ -156,10 +156,14 @@ class _HomeScreenState extends State<HomeScreen> {
           final startDate = userPeriodSchedules.isNotEmpty
               ? userPeriodSchedules.first.date
               : today;
+          final endDate = userPeriodSchedules.isNotEmpty
+              ? userPeriodSchedules.last.date
+              : today;
 
           // Fire-and-forget: do not block the UI.
           NotificationService.instance.scheduleCleaningCountdown(
-            startDate: startDate,
+            periodStartDate: startDate,
+            periodEndDate: endDate,
           );
           _notificationsScheduled = true;
         }

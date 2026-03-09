@@ -136,12 +136,19 @@ class NotificationService {
 
   /// Schedule countdown notifications for a cleaning period.
   ///
-  /// [startDate] is the first day of the cleaning period.
-  /// [periodDays] is the total period length (default 3).
+  /// [periodStartDate] is the first day of the cleaning period.
+  /// [periodEndDate] is the last day of the cleaning period.
+  /// [periodDays] is the total period length (default 3), used only to
+  /// determine how many notification IDs to cancel upfront.
+  ///
+  /// Only schedules notifications for days >= today AND <= [periodEndDate].
+  /// Past days are skipped. Remaining-days count is computed from
+  /// [periodEndDate] so it reflects the actual days left in the period.
   ///
   /// Cancels any existing cleaning notifications before scheduling new ones.
   Future<void> scheduleCleaningCountdown({
-    required DateTime startDate,
+    required DateTime periodStartDate,
+    required DateTime periodEndDate,
     int periodDays = 3,
   }) async {
     // Cancel any existing cleaning notifications first.
@@ -151,44 +158,48 @@ class NotificationService {
 
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
+    final periodEnd = DateTime(
+      periodEndDate.year,
+      periodEndDate.month,
+      periodEndDate.day,
+    );
 
     for (var i = 0; i < periodDays; i++) {
-      final notifDate = DateTime(
-        startDate.year,
-        startDate.month,
-        startDate.day + i,
+      final day = DateTime(
+        periodStartDate.year,
+        periodStartDate.month,
+        periodStartDate.day + i,
         8,
         0,
       ); // 8 AM
-      final remaining = periodDays - i;
+      final dayOnly = DateTime(day.year, day.month, day.day);
 
-      final isToday =
-          notifDate.year == today.year &&
-          notifDate.month == today.month &&
-          notifDate.day == today.day;
+      // Skip days before today.
+      if (dayOnly.isBefore(today)) continue;
+      // Skip days after period end.
+      if (dayOnly.isAfter(periodEnd)) continue;
+
+      final remaining = periodEnd.difference(dayOnly).inDays + 1;
+
+      final isToday = dayOnly == today;
+      final body = remaining == 1
+          ? 'Te queda 1 dia disponible para hacer el aseo'
+          : remaining == periodDays
+          ? 'Tienes $remaining dias disponibles para hacer el aseo'
+          : 'Te quedan $remaining dias disponibles para hacer el aseo';
 
       if (isToday) {
-        // If it is today, show immediately.
-        final body = remaining == 1
-            ? 'Te queda 1 dia disponible para hacer el aseo'
-            : 'Te quedan $remaining dias disponibles para hacer el aseo';
         await show(
           id: _cleaningBaseId + i,
           title: 'Limpy - Periodo de Aseo',
           body: body,
         );
-      } else if (notifDate.isAfter(now)) {
-        final body = remaining == periodDays
-            ? 'Tienes $remaining dias disponibles para hacer el aseo'
-            : remaining == 1
-            ? 'Te queda 1 dia disponible para hacer el aseo'
-            : 'Te quedan $remaining dias disponibles para hacer el aseo';
-
+      } else {
         await scheduleAt(
           id: _cleaningBaseId + i,
           title: 'Limpy - Periodo de Aseo',
           body: body,
-          scheduledDate: notifDate,
+          scheduledDate: day,
         );
       }
     }
