@@ -293,5 +293,91 @@ void main() {
         expect(result.map((s) => s.id).toList(), ['s1', 's2', 's3']);
       },
     );
+
+    test('prórroga swap only affects involved periods — '
+        'not all schedules between the two users', () {
+      // userA has 6 consecutive schedules (2 periods of 3 days each).
+      // userB has 6 consecutive schedules (2 periods of 3 days each).
+      // The swap anchor is in userA's FIRST period and userB's FIRST period.
+      // With maxSize:3, only the 3 schedules of each involved period are
+      // swapped — the other 3 schedules of each user are NOT touched.
+      final schedules = [
+        // userA — period 1 (involved in swap)
+        _schedule('a1', 'userA', DateTime(2026, 3, 1)),
+        _schedule('a2', 'userA', DateTime(2026, 3, 2)),
+        _schedule('a3', 'userA', DateTime(2026, 3, 3)),
+        // userA — period 2 (NOT involved in swap)
+        _schedule('a4', 'userA', DateTime(2026, 3, 4)),
+        _schedule('a5', 'userA', DateTime(2026, 3, 5)),
+        _schedule('a6', 'userA', DateTime(2026, 3, 6)),
+        // userB — period 1 (involved in swap)
+        _schedule('b1', 'userB', DateTime(2026, 3, 10)),
+        _schedule('b2', 'userB', DateTime(2026, 3, 11)),
+        _schedule('b3', 'userB', DateTime(2026, 3, 12)),
+        // userB — period 2 (NOT involved in swap)
+        _schedule('b4', 'userB', DateTime(2026, 3, 13)),
+        _schedule('b5', 'userB', DateTime(2026, 3, 14)),
+        _schedule('b6', 'userB', DateTime(2026, 3, 15)),
+      ];
+
+      // Anchor is the first schedule of userA's first period.
+      final requesterAnchor = schedules[0]; // a1
+
+      // With maxSize:3, only the first 3 consecutive userA schedules are
+      // returned — a4/a5/a6 (period 2) are excluded.
+      final requesterPeriod = findPeriodSchedules(
+        schedules,
+        requesterAnchor,
+        maxSize: 3,
+      );
+      expect(
+        requesterPeriod.map((s) => s.id).toList(),
+        ['a1', 'a2', 'a3'],
+        reason:
+            'Only the 3 schedules of the involved period are selected; '
+            'a4, a5, a6 (userA period 2) must not be included.',
+      );
+
+      // Anchor is the first schedule of userB's first period.
+      final nextUserAnchor = schedules[6]; // b1
+
+      // With maxSize:3, only the first 3 consecutive userB schedules are
+      // returned — b4/b5/b6 (period 2) are excluded.
+      final nextUserPeriod = findPeriodSchedules(
+        schedules,
+        nextUserAnchor,
+        maxSize: 3,
+      );
+      expect(
+        nextUserPeriod.map((s) => s.id).toList(),
+        ['b1', 'b2', 'b3'],
+        reason:
+            'Only the 3 schedules of the involved period are selected; '
+            'b4, b5, b6 (userB period 2) must not be included.',
+      );
+
+      // Simulate the swap: requester's period → nextUserId, next user's → requesterId.
+      final swappedRequesterIds = requesterPeriod.map((s) => s.id).toSet();
+      final swappedNextUserIds = nextUserPeriod.map((s) => s.id).toSet();
+
+      // The schedules NOT involved in the swap must remain untouched.
+      final untouchedUserAIds = {'a4', 'a5', 'a6'};
+      final untouchedUserBIds = {'b4', 'b5', 'b6'};
+
+      expect(
+        swappedRequesterIds.intersection(untouchedUserAIds),
+        isEmpty,
+        reason: 'userA period 2 schedules (a4, a5, a6) must not be swapped.',
+      );
+      expect(
+        swappedNextUserIds.intersection(untouchedUserBIds),
+        isEmpty,
+        reason: 'userB period 2 schedules (b4, b5, b6) must not be swapped.',
+      );
+
+      // Exactly 3 schedules per side are swapped.
+      expect(swappedRequesterIds.length, 3);
+      expect(swappedNextUserIds.length, 3);
+    });
   });
 }

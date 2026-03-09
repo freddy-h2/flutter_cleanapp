@@ -149,22 +149,27 @@ class _LimpyAppState extends State<LimpyApp> {
     }
     try {
       final now = DateTime.now();
-      final currentMonday = now.subtract(Duration(days: now.weekday - 1));
-      final currentWeekStart = DateTime(
-        currentMonday.year,
-        currentMonday.month,
-        currentMonday.day,
+      final today = DateTime(now.year, now.month, now.day);
+      final periodStart = today.subtract(
+        const Duration(days: SupabaseService.cleaningPeriodDays - 1),
       );
-      final currentWeekEnd = currentWeekStart.add(const Duration(days: 7));
+      final periodEnd = today;
 
       final schedules = await SupabaseService.instance.getSchedules();
-      final schedule = schedules.where((s) {
-        return s.userId == _currentUser!.id &&
-            !s.date.isBefore(currentWeekStart) &&
-            s.date.isBefore(currentWeekEnd);
-      }).firstOrNull;
 
-      bool isResponsible = schedule != null;
+      // Find schedules in the current 3-day period window.
+      final currentPeriodSchedules = schedules.where((s) {
+        final d = DateTime(s.date.year, s.date.month, s.date.day);
+        return !d.isBefore(periodStart) && !d.isAfter(periodEnd);
+      }).toList();
+
+      // Find the schedule belonging to the current user in this period.
+      final schedule = currentPeriodSchedules
+          .where((s) => s.userId == _currentUser!.id)
+          .firstOrNull;
+
+      // User is responsible only if they have a schedule AND it is not completed.
+      bool isResponsible = schedule != null && !schedule.isCompleted;
 
       if (isResponsible) {
         final extensions = await SupabaseService.instance
