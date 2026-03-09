@@ -1,4 +1,7 @@
+import 'dart:ui';
+
 import 'package:app_links/app_links.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_cleanapp/core/realtime_service.dart';
 import 'package:flutter_cleanapp/core/supabase_config.dart';
@@ -191,9 +194,9 @@ class _LimpyAppState extends State<LimpyApp> {
   };
 
   IconData get _themeModeIcon => switch (_themeMode) {
-    AppThemeMode.system => Icons.brightness_auto,
-    AppThemeMode.light => Icons.light_mode,
-    AppThemeMode.dark => Icons.dark_mode,
+    AppThemeMode.system => CupertinoIcons.circle_lefthalf_fill,
+    AppThemeMode.light => CupertinoIcons.sun_max_fill,
+    AppThemeMode.dark => CupertinoIcons.moon_fill,
   };
 
   Widget _buildRetryScreen() {
@@ -204,7 +207,11 @@ class _LimpyAppState extends State<LimpyApp> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline, size: 64, color: Colors.red),
+              const Icon(
+                CupertinoIcons.exclamationmark_circle,
+                size: 64,
+                color: Colors.red,
+              ),
               const SizedBox(height: 16),
               const Text(
                 'Error al cargar perfil. Intenta de nuevo.',
@@ -230,64 +237,57 @@ class _LimpyAppState extends State<LimpyApp> {
 
   Widget _buildMainShell() {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Limpy'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            tooltip: 'Notificaciones',
-            onPressed: () {
-              _navigatorKey.currentState?.push(
-                MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-              );
-            },
-          ),
-        ],
+      appBar: CupertinoNavigationBar(
+        middle: const Text('Limpy'),
+        trailing: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Icon(CupertinoIcons.bell),
+          onPressed: () {
+            _navigatorKey.currentState?.push(
+              CupertinoPageRoute(builder: (_) => const NotificationsScreen()),
+            );
+          },
+        ),
+        backgroundColor: CupertinoColors.systemBackground.withValues(
+          alpha: 0.8,
+        ),
+        border: null,
       ),
       body: IndexedStack(index: _currentIndex, children: _screens),
-      bottomNavigationBar: Container(
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: Theme.of(context).shadowColor.withValues(alpha: 0.15),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+      bottomNavigationBar: ClipRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 15.0, sigmaY: 15.0),
+          child: CupertinoTabBar(
+            currentIndex: _currentIndex,
+            onTap: (index) => setState(() => _currentIndex = index),
+            activeColor: CupertinoColors.activeBlue,
+            backgroundColor: CupertinoColors.systemBackground.withValues(
+              alpha: 0.6,
             ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: NavigationBar(
-            selectedIndex: _currentIndex,
-            onDestinationSelected: (index) =>
-                setState(() => _currentIndex = index),
-            height: 70,
-            destinations: const [
-              NavigationDestination(
-                icon: Icon(Icons.calendar_month_outlined),
-                selectedIcon: Icon(Icons.calendar_month),
+            items: const [
+              BottomNavigationBarItem(
+                icon: Icon(CupertinoIcons.calendar),
+                activeIcon: Icon(CupertinoIcons.calendar_today),
                 label: 'Calendario',
               ),
-              NavigationDestination(
-                icon: Icon(Icons.checklist_outlined),
-                selectedIcon: Icon(Icons.checklist),
+              BottomNavigationBarItem(
+                icon: Icon(CupertinoIcons.checkmark_square),
+                activeIcon: Icon(CupertinoIcons.checkmark_square_fill),
                 label: 'Actividades',
               ),
-              NavigationDestination(
-                icon: Icon(Icons.home_outlined),
-                selectedIcon: Icon(Icons.home),
+              BottomNavigationBarItem(
+                icon: Icon(CupertinoIcons.house),
+                activeIcon: Icon(CupertinoIcons.house_fill),
                 label: 'Inicio',
               ),
-              NavigationDestination(
-                icon: Icon(Icons.comment_outlined),
-                selectedIcon: Icon(Icons.comment),
+              BottomNavigationBarItem(
+                icon: Icon(CupertinoIcons.chat_bubble_2),
+                activeIcon: Icon(CupertinoIcons.chat_bubble_2_fill),
                 label: 'Comentarios',
               ),
-              NavigationDestination(
-                icon: Icon(Icons.settings_outlined),
-                selectedIcon: Icon(Icons.settings),
+              BottomNavigationBarItem(
+                icon: Icon(CupertinoIcons.gear),
+                activeIcon: Icon(CupertinoIcons.gear_solid),
                 label: 'Configuración',
               ),
             ],
