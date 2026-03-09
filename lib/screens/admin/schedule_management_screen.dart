@@ -498,6 +498,7 @@ class _CycleGeneratorPage extends StatefulWidget {
 
 class _CycleGeneratorPageState extends State<_CycleGeneratorPage> {
   late final Map<String, bool> _selectedUsers;
+  late List<UserModel> _orderedUsers;
   DateTime _startDate = DateTime.now();
   final _periodDaysController = TextEditingController(text: '3');
   final _numberOfCyclesController = TextEditingController(text: '1');
@@ -508,6 +509,7 @@ class _CycleGeneratorPageState extends State<_CycleGeneratorPage> {
   @override
   void initState() {
     super.initState();
+    _orderedUsers = List.from(widget.users);
     _selectedUsers = {for (final u in widget.users) u.id: false};
   }
 
@@ -520,6 +522,13 @@ class _CycleGeneratorPageState extends State<_CycleGeneratorPage> {
 
   bool get _anyUserSelected =>
       _selectedUsers.values.any((selected) => selected);
+
+  int _getSelectedIndex(UserModel user) {
+    final selected = _orderedUsers
+        .where((u) => _selectedUsers[u.id] == true)
+        .toList();
+    return selected.indexOf(user);
+  }
 
   String _formatDate(DateTime date) {
     final day = date.day.toString().padLeft(2, '0');
@@ -549,7 +558,7 @@ class _CycleGeneratorPageState extends State<_CycleGeneratorPage> {
       1,
     );
 
-    final selectedUsers = widget.users
+    final selectedUsers = _orderedUsers
         .where((u) => _selectedUsers[u.id] == true)
         .map((u) => (id: u.id, name: u.name))
         .toList();
@@ -665,8 +674,8 @@ class _CycleGeneratorPageState extends State<_CycleGeneratorPage> {
   @override
   Widget build(BuildContext context) {
     final allSelected =
-        widget.users.isNotEmpty &&
-        widget.users.every((u) => _selectedUsers[u.id] == true);
+        _orderedUsers.isNotEmpty &&
+        _orderedUsers.every((u) => _selectedUsers[u.id] == true);
 
     return Scaffold(
       appBar: AppBar(
@@ -683,7 +692,7 @@ class _CycleGeneratorPageState extends State<_CycleGeneratorPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
-                  'Usuarios',
+                  'Usuarios (arrastra para reordenar)',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 TextButton(
@@ -701,15 +710,50 @@ class _CycleGeneratorPageState extends State<_CycleGeneratorPage> {
                 ),
               ],
             ),
-            for (final user in widget.users)
-              CheckboxListTile(
-                title: Text('${user.name} — ${user.room}'),
-                value: _selectedUsers[user.id] ?? false,
-                onChanged: (v) {
-                  setState(() => _selectedUsers[user.id] = v ?? false);
-                },
-                contentPadding: EdgeInsets.zero,
-              ),
+            const SizedBox(height: 8),
+            ReorderableListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _orderedUsers.length,
+              onReorder: (oldIndex, newIndex) {
+                setState(() {
+                  if (newIndex > oldIndex) newIndex--;
+                  final user = _orderedUsers.removeAt(oldIndex);
+                  _orderedUsers.insert(newIndex, user);
+                });
+              },
+              itemBuilder: (context, index) {
+                final user = _orderedUsers[index];
+                final isSelected = _selectedUsers[user.id] == true;
+                final selectedIndex = _getSelectedIndex(user);
+                return CheckboxListTile(
+                  key: ValueKey(user.id),
+                  value: isSelected,
+                  onChanged: (v) {
+                    setState(() => _selectedUsers[user.id] = v ?? false);
+                  },
+                  title: Row(
+                    children: [
+                      if (isSelected)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: CircleAvatar(
+                            radius: 14,
+                            child: Text('${selectedIndex + 1}'),
+                          ),
+                        ),
+                      Expanded(child: Text(user.name)),
+                    ],
+                  ),
+                  subtitle: Text(user.room),
+                  secondary: ReorderableDragStartListener(
+                    index: index,
+                    child: const Icon(Icons.drag_handle),
+                  ),
+                  contentPadding: const EdgeInsets.only(left: 0, right: 8),
+                );
+              },
+            ),
             const SizedBox(height: 16),
 
             // --- Start date ---
