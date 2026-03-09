@@ -33,6 +33,7 @@ class _LimpyAppState extends State<LimpyApp> {
   bool _isAuthenticated = false;
   UserModel? _currentUser;
   bool _isLoadingUser = false;
+  bool _pendingPasswordReset = false;
 
   final _navigatorKey = GlobalKey<NavigatorState>();
   late final AppLinks _appLinks;
@@ -54,7 +55,13 @@ class _LimpyAppState extends State<LimpyApp> {
       if (event == AuthChangeEvent.signedIn ||
           event == AuthChangeEvent.tokenRefreshed ||
           event == AuthChangeEvent.userUpdated) {
-        _loadCurrentUser();
+        _loadCurrentUser().then((_) {
+          if (_pendingPasswordReset &&
+              _isAuthenticated &&
+              _currentUser != null) {
+            _showPasswordResetDialog();
+          }
+        });
       } else if (event == AuthChangeEvent.signedOut) {
         setState(() {
           _isAuthenticated = false;
@@ -106,10 +113,104 @@ class _LimpyAppState extends State<LimpyApp> {
 
   void _handleDeepLink(Uri uri) {
     if (uri.scheme == 'limpy' && uri.host == 'reset-callback') {
+      _pendingPasswordReset = true;
       if (_isAuthenticated && _currentUser != null) {
-        setState(() => _currentIndex = 4);
+        _showPasswordResetDialog();
       }
     }
+  }
+
+  Future<void> _showPasswordResetDialog() async {
+    _pendingPasswordReset = false;
+    final newPasswordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
+
+    final confirmed = await showDialog<bool>(
+      context: _navigatorKey.currentContext!,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Restablecer Contraseña'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Ingresa tu nueva contraseña para completar el restablecimiento.',
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: newPasswordController,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Nueva contraseña',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: confirmPasswordController,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Confirmar contraseña',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final newPassword = newPasswordController.text;
+      final confirmPassword = confirmPasswordController.text;
+
+      if (newPassword.length < 6) {
+        if (mounted) {
+          ScaffoldMessenger.of(_navigatorKey.currentContext!).showSnackBar(
+            const SnackBar(
+              content: Text('La contraseña debe tener al menos 6 caracteres'),
+            ),
+          );
+        }
+      } else if (newPassword != confirmPassword) {
+        if (mounted) {
+          ScaffoldMessenger.of(_navigatorKey.currentContext!).showSnackBar(
+            const SnackBar(content: Text('Las contraseñas no coinciden')),
+          );
+        }
+      } else {
+        try {
+          await SupabaseConfig.client.auth.updateUser(
+            UserAttributes(password: newPassword),
+          );
+          if (mounted) {
+            ScaffoldMessenger.of(_navigatorKey.currentContext!).showSnackBar(
+              const SnackBar(
+                content: Text('Contraseña actualizada exitosamente'),
+              ),
+            );
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(
+              _navigatorKey.currentContext!,
+            ).showSnackBar(SnackBar(content: Text('Error: $e')));
+          }
+        }
+      }
+    }
+
+    newPasswordController.dispose();
+    confirmPasswordController.dispose();
   }
 
   /// Shows a dialog for sending anonymous app feedback.
