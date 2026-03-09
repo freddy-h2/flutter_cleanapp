@@ -386,6 +386,8 @@ class _LimpyAppState extends State<LimpyApp> {
             ? Brightness.dark
             : null,
         border: null,
+        // Disable route transition hero animation which adds its own blur.
+        transitionBetweenRoutes: false,
       ),
       body: IndexedStack(index: _currentIndex, children: _screens),
       bottomNavigationBar: Container(
@@ -407,7 +409,9 @@ class _LimpyAppState extends State<LimpyApp> {
         child: ClipRRect(
           borderRadius: BorderRadius.circular(28),
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 20.0, sigmaY: 20.0),
+            filter: Theme.of(context).brightness == Brightness.dark
+                ? ImageFilter.blur(sigmaX: 0, sigmaY: 0)
+                : ImageFilter.blur(sigmaX: 20.0, sigmaY: 20.0),
             child: CupertinoTabBar(
               currentIndex: _currentIndex,
               onTap: (index) => setState(() => _currentIndex = index),

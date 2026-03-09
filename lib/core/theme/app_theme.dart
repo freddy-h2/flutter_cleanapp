@@ -93,6 +93,7 @@ abstract final class AppTheme {
       seedColor: seedColor,
       brightness: Brightness.dark,
     ),
+    scaffoldBackgroundColor: Colors.black,
     textTheme: GoogleFonts.interTextTheme(
       ThemeData(brightness: Brightness.dark).textTheme,
     ),
