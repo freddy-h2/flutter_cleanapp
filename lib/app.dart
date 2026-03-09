@@ -161,19 +161,18 @@ class _LimpyAppState extends State<LimpyApp> {
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert),
             tooltip: 'Menú',
-            onSelected: (value) {
+            onSelected: (value) async {
               switch (value) {
                 case 'theme':
                   _toggleTheme();
                 case 'profile':
-                  Navigator.push<bool>(
+                  final changed = await Navigator.push<bool>(
                     context,
                     MaterialPageRoute(
                       builder: (_) => ProfileScreen(currentUser: _currentUser!),
                     ),
-                  ).then((changed) {
-                    if (changed == true) _loadCurrentUser();
-                  });
+                  );
+                  if (changed == true && mounted) _loadCurrentUser();
                 case 'logout':
                   _logout();
               }
@@ -181,35 +180,41 @@ class _LimpyAppState extends State<LimpyApp> {
             itemBuilder: (context) => [
               PopupMenuItem(
                 value: 'theme',
-                child: ListTile(
-                  leading: Icon(_themeModeIcon),
-                  title: const Text('Cambiar tema'),
-                  contentPadding: EdgeInsets.zero,
+                child: Row(
+                  children: [
+                    Icon(_themeModeIcon),
+                    const SizedBox(width: 12),
+                    const Text('Cambiar tema'),
+                  ],
                 ),
               ),
               const PopupMenuItem(
                 value: 'profile',
-                child: ListTile(
-                  leading: Icon(Icons.person),
-                  title: Text('Administrar perfil'),
-                  contentPadding: EdgeInsets.zero,
+                child: Row(
+                  children: [
+                    Icon(Icons.person),
+                    SizedBox(width: 12),
+                    Text('Administrar perfil'),
+                  ],
                 ),
               ),
               const PopupMenuDivider(),
               PopupMenuItem(
                 value: 'logout',
-                child: ListTile(
-                  leading: Icon(
-                    Icons.logout,
-                    color: Theme.of(context).colorScheme.error,
-                  ),
-                  title: Text(
-                    'Cerrar sesión',
-                    style: TextStyle(
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.logout,
                       color: Theme.of(context).colorScheme.error,
                     ),
-                  ),
-                  contentPadding: EdgeInsets.zero,
+                    const SizedBox(width: 12),
+                    Text(
+                      'Cerrar sesión',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
