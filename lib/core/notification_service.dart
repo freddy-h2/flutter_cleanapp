@@ -82,4 +82,67 @@ class NotificationService {
   Future<void> cancelAll() async {
     await _plugin.cancelAll();
   }
+
+  /// Notification ID base for cleaning period countdown notifications.
+  static const int _cleaningBaseId = 1000;
+
+  /// Schedule countdown notifications for a cleaning period.
+  ///
+  /// [startDate] is the first day of the cleaning period.
+  /// [periodDays] is the total period length (default 3).
+  ///
+  /// Cancels any existing cleaning notifications before scheduling new ones.
+  Future<void> scheduleCleaningCountdown({
+    required DateTime startDate,
+    int periodDays = 3,
+  }) async {
+    // Cancel any existing cleaning notifications first.
+    for (var i = 0; i < periodDays; i++) {
+      await cancel(_cleaningBaseId + i);
+    }
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    for (var i = 0; i < periodDays; i++) {
+      final notifDate = DateTime(
+        startDate.year,
+        startDate.month,
+        startDate.day + i,
+        8,
+        0,
+      ); // 8 AM
+      final remaining = periodDays - i;
+
+      final isToday =
+          notifDate.year == today.year &&
+          notifDate.month == today.month &&
+          notifDate.day == today.day;
+
+      if (isToday) {
+        // If it is today, show immediately.
+        final body = remaining == 1
+            ? 'Te queda 1 dia disponible para hacer el aseo'
+            : 'Te quedan $remaining dias disponibles para hacer el aseo';
+        await show(
+          id: _cleaningBaseId + i,
+          title: 'Limpy - Periodo de Aseo',
+          body: body,
+        );
+      } else if (notifDate.isAfter(now)) {
+        final body = remaining == periodDays
+            ? 'Tienes $remaining dias disponibles para hacer el aseo'
+            : remaining == 1
+            ? 'Te queda 1 dia disponible para hacer el aseo'
+            : 'Te quedan $remaining dias disponibles para hacer el aseo';
+
+        await scheduleAt(
+          id: _cleaningBaseId + i,
+          title: 'Limpy - Periodo de Aseo',
+          body: body,
+          scheduledDate: notifDate,
+        );
+      }
+    }
+  }
 }

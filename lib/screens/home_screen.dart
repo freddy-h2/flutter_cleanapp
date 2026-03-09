@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_cleanapp/core/notification_service.dart';
 import 'package:flutter_cleanapp/core/realtime_service.dart';
 import 'package:flutter_cleanapp/data/supabase_service.dart';
 import 'package:flutter_cleanapp/models/cleaning_schedule.dart';
@@ -33,6 +34,9 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
   bool _hasExistingRequest = false;
   bool _isRequestingExtension = false;
+
+  /// Guard flag to avoid scheduling notifications on every reload.
+  bool _notificationsScheduled = false;
 
   /// Number of pending extension requests (admin only).
   int _pendingExtensionCount = 0;
@@ -86,20 +90,56 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
 
-      // Check for an existing pending extension request for the current week.
+      // Check for an existing pending extension request for the current period.
       final now = DateTime.now();
-      final thisMonday = _mondayOf(now);
-      CleaningSchedule? currentWeekSchedule;
+      final today = DateTime(now.year, now.month, now.day);
+      final periodStart = today.subtract(
+        const Duration(days: SupabaseService.cleaningPeriodDays - 1),
+      );
+      CleaningSchedule? currentPeriodSchedule;
       for (final s in schedules) {
-        final weekMonday = _mondayOf(s.date);
-        if (!weekMonday.isBefore(thisMonday) &&
-            !weekMonday.isAfter(thisMonday)) {
-          currentWeekSchedule = s;
+        final d = DateTime(s.date.year, s.date.month, s.date.day);
+        if (!d.isBefore(periodStart) && !d.isAfter(today)) {
+          currentPeriodSchedule = s;
           break;
         }
       }
-      if (currentWeekSchedule != null) {
-        await _checkExistingRequest(currentWeekSchedule);
+      if (currentPeriodSchedule != null) {
+        await _checkExistingRequest(currentPeriodSchedule);
+      }
+
+      // Schedule cleaning countdown notifications when the user is responsible
+      // and the cleaning period is not yet completed.
+      if (!_notificationsScheduled) {
+        final currentUser = widget.currentUser;
+        final isResponsible =
+            currentPeriodSchedule != null &&
+            currentPeriodSchedule.userId == currentUser.id &&
+            !currentPeriodSchedule.isCompleted;
+
+        if (isResponsible) {
+          // Find the earliest date among the user's current-period schedules.
+          final userPeriodSchedules =
+              schedules
+                  .where((s) => s.userId == currentUser.id)
+                  .where((s) => !s.isCompleted)
+                  .where((s) {
+                    final d = DateTime(s.date.year, s.date.month, s.date.day);
+                    return !d.isBefore(periodStart) && !d.isAfter(today);
+                  })
+                  .toList()
+                ..sort((a, b) => a.date.compareTo(b.date));
+
+          final startDate = userPeriodSchedules.isNotEmpty
+              ? userPeriodSchedules.first.date
+              : today;
+
+          // Fire-and-forget: do not block the UI.
+          NotificationService.instance.scheduleCleaningCountdown(
+            startDate: startDate,
+          );
+          _notificationsScheduled = true;
+        }
       }
 
       // Check for an incoming extension request where this user is next_user_id.
@@ -241,27 +281,29 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  /// Sends an extension request for the current week's schedule.
+  /// Sends an extension request for the current period's schedule.
   Future<void> _requestExtension() async {
     setState(() => _isRequestingExtension = true);
 
     try {
       final currentUser = widget.currentUser;
       final now = DateTime.now();
-      final thisMonday = _mondayOf(now);
+      final today = DateTime(now.year, now.month, now.day);
+      final periodStart = today.subtract(
+        const Duration(days: SupabaseService.cleaningPeriodDays - 1),
+      );
 
-      // Identify the current week's schedule.
-      CleaningSchedule? currentWeekSchedule;
+      // Identify the current period's schedule for this user.
+      CleaningSchedule? currentPeriodSchedule;
       for (final s in _schedules) {
-        final weekMonday = _mondayOf(s.date);
-        if (!weekMonday.isBefore(thisMonday) &&
-            !weekMonday.isAfter(thisMonday)) {
-          currentWeekSchedule = s;
+        final d = DateTime(s.date.year, s.date.month, s.date.day);
+        if (!d.isBefore(periodStart) && !d.isAfter(today)) {
+          currentPeriodSchedule = s;
           break;
         }
       }
 
-      if (currentWeekSchedule == null) {
+      if (currentPeriodSchedule == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -274,11 +316,11 @@ class _HomeScreenState extends State<HomeScreen> {
         return;
       }
 
-      // Find the next schedule after the current week where userId differs.
+      // Find the next schedule after the current period where userId differs.
       CleaningSchedule? nextSchedule;
       for (final s in _schedules) {
         if (s.userId != currentUser.id &&
-            s.date.isAfter(currentWeekSchedule.date)) {
+            s.date.isAfter(currentPeriodSchedule.date)) {
           if (nextSchedule == null || s.date.isBefore(nextSchedule.date)) {
             nextSchedule = s;
           }
@@ -299,7 +341,7 @@ class _HomeScreenState extends State<HomeScreen> {
       }
 
       await SupabaseService.instance.createExtensionRequest(
-        scheduleId: currentWeekSchedule.id,
+        scheduleId: currentPeriodSchedule.id,
         requesterId: currentUser.id,
         nextUserId: nextSchedule.userId,
       );
@@ -401,24 +443,33 @@ class _HomeScreenState extends State<HomeScreen> {
     final currentUser = widget.currentUser;
 
     final now = DateTime.now();
-    final thisMonday = _mondayOf(now);
-    final thisSunday = thisMonday.add(const Duration(days: 6));
+    final today = DateTime(now.year, now.month, now.day);
+    final periodStart = today.subtract(
+      const Duration(days: SupabaseService.cleaningPeriodDays - 1),
+    );
+    final periodEnd = today;
 
-    // Find the schedule entry for the current week.
-    CleaningSchedule? currentWeekSchedule;
-    for (final s in _schedules) {
-      final weekMonday = _mondayOf(s.date);
-      if (!weekMonday.isBefore(thisMonday) && !weekMonday.isAfter(thisMonday)) {
-        currentWeekSchedule = s;
-        break;
-      }
-    }
+    // Find all schedule entries within the current 3-day period for this user.
+    final currentPeriodSchedules = _schedules.where((s) {
+      final d = DateTime(s.date.year, s.date.month, s.date.day);
+      return !d.isBefore(periodStart) && !d.isAfter(periodEnd);
+    }).toList();
 
-    // Determine if the current user is responsible this week.
+    // The first schedule in the current period (for extension request lookup).
+    final CleaningSchedule? currentPeriodSchedule =
+        currentPeriodSchedules.isNotEmpty ? currentPeriodSchedules.first : null;
+
+    // Determine if the current user is responsible in the current period.
     final bool isResponsible =
-        currentWeekSchedule != null &&
-        currentWeekSchedule.userId == currentUser.id &&
-        !currentWeekSchedule.isCompleted;
+        currentPeriodSchedule != null &&
+        currentPeriodSchedule.userId == currentUser.id &&
+        !currentPeriodSchedule.isCompleted;
+
+    // Compute the display dates for the current period.
+    final DateTime displayPeriodStart = periodStart;
+    final DateTime displayPeriodEnd = periodStart.add(
+      const Duration(days: SupabaseService.cleaningPeriodDays - 1),
+    );
 
     /// Admin panel cards shown only to admin users.
     Widget adminCard() => Column(
