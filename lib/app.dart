@@ -8,6 +8,7 @@ import 'package:flutter_cleanapp/screens/auth_screen.dart';
 import 'package:flutter_cleanapp/screens/calendar_screen.dart';
 import 'package:flutter_cleanapp/screens/comments_screen.dart';
 import 'package:flutter_cleanapp/screens/home_screen.dart';
+import 'package:flutter_cleanapp/screens/profile_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Root application widget that owns theme state and bottom navigation.

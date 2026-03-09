@@ -134,7 +134,7 @@ class SupabaseService {
         .from('tasks')
         .select()
         .eq('is_active', true)
-        .order('sort_order');
+        .order('sort_order', ascending: true);
     return data.map((json) => CleaningTask.fromJson(json)).toList();
   }
 
@@ -143,7 +143,7 @@ class SupabaseService {
     final data = await SupabaseConfig.client
         .from('tasks')
         .select()
-        .order('sort_order');
+        .order('sort_order', ascending: true);
     return data.map((json) => CleaningTask.fromJson(json)).toList();
   }
 
