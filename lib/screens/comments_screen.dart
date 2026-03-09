@@ -7,6 +7,7 @@ import 'package:flutter_cleanapp/data/supabase_service.dart';
 import 'package:flutter_cleanapp/models/cleaning_schedule.dart';
 import 'package:flutter_cleanapp/models/comment.dart';
 import 'package:flutter_cleanapp/models/user_model.dart';
+import 'package:flutter_cleanapp/screens/comment_chat_screen.dart';
 
 /// Screen that shows a single role-based view for comments.
 ///
@@ -40,9 +41,6 @@ class _CommentsScreenState extends State<CommentsScreen> {
   /// For inbox view: all top-level comments with their replies.
   Map<Comment, List<Comment>> _commentsWithReplies = {};
 
-  /// Reply controllers — one per comment being replied to.
-  final Map<String, TextEditingController> _replyControllers = {};
-
   late final StreamSubscription<void> _commentsRealtimeSub;
   late final StreamSubscription<void> _schedulesRealtimeSub;
 
@@ -72,9 +70,6 @@ class _CommentsScreenState extends State<CommentsScreen> {
     _schedulesRealtimeSub.cancel();
     _messageController.dispose();
     _senderScrollController.dispose();
-    for (final controller in _replyControllers.values) {
-      controller.dispose();
-    }
     super.dispose();
   }
 
@@ -174,31 +169,6 @@ class _CommentsScreenState extends State<CommentsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error al enviar comentario: $e')),
-        );
-      }
-    }
-  }
-
-  /// Sends a reply to [parentComment] from the responsible user.
-  Future<void> _sendReply(Comment parentComment) async {
-    final controller = _replyControllers[parentComment.id];
-    if (controller == null || controller.text.trim().isEmpty) return;
-
-    try {
-      await SupabaseService.instance.sendComment(
-        _currentWeekSchedule!.id,
-        controller.text.trim(),
-        senderId: widget.currentUser.id,
-        parentId: parentComment.id,
-      );
-      if (mounted) {
-        controller.clear();
-        // Data will reload via Realtime subscription.
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al enviar respuesta: $e')),
         );
       }
     }
@@ -452,135 +422,121 @@ class _CommentsScreenState extends State<CommentsScreen> {
     );
   }
 
-  /// Builds the inbox view for the responsible user.
+  /// Builds the inbox view for the responsible user (WhatsApp-style
+  /// conversation list).
   Widget _buildInboxView() {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Icon(CupertinoIcons.tray, size: 48, color: colorScheme.primary),
-          const SizedBox(height: 12),
-          Text(
-            'Buzón de Comentarios',
-            style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Comentarios anónimos de tus vecinos',
-            style: textTheme.bodyMedium?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          if (_commentsWithReplies.isEmpty)
-            const Center(child: Text('No tienes comentarios aún'))
-          else
-            for (final entry in _commentsWithReplies.entries)
-              _buildInboxCommentConversation(entry.key, entry.value),
-        ],
-      ),
+    return Column(
+      children: [
+        _buildInboxHeader(),
+        Expanded(child: _buildConversationList()),
+      ],
     );
   }
 
-  /// Builds a chat-style conversation for an inbox comment with reply
-  /// capability.
-  Widget _buildInboxCommentConversation(
-    Comment comment,
-    List<Comment> replies,
-  ) {
+  /// Compact header showing the inbox title and conversation count.
+  Widget _buildInboxHeader() {
+    final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
+    final count = _commentsWithReplies.length;
+    final subtitle = count == 0
+        ? 'No tienes comentarios aún'
+        : '$count conversaciones';
 
-    // Ensure a reply controller exists for this comment.
-    _replyControllers.putIfAbsent(comment.id, () => TextEditingController());
-    final replyController = _replyControllers[comment.id]!;
-
-    // Sort replies chronologically.
-    final sortedReplies = [...replies]
-      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Anonymous comment — left-aligned bubble.
-          _buildChatBubble(
-            message: comment.message,
-            time: _formatTime(comment.createdAt),
-            isMe: false,
-            senderLabel: 'Anónimo',
-            bgColor: colorScheme.surfaceContainerHighest,
-          ),
-          // Replies from responsible (current user) — right-aligned bubbles.
-          for (final reply in sortedReplies)
-            _buildChatBubble(
-              message: reply.message,
-              time: _formatTime(reply.createdAt),
-              isMe: true,
-              senderLabel: 'Tú',
-            ),
-          // Quick reply suggestion chips.
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              children: [
-                _buildSuggestionChip('Ok, enterado 👍', replyController),
-                _buildSuggestionChip('Entendido ✅', replyController),
-                _buildSuggestionChip('Trabajo en eso 🔧', replyController),
-                _buildSuggestionChip(
-                  '¡Gracias por avisar! 😊',
-                  replyController,
-                ),
-                _buildSuggestionChip('Lo reviso pronto 🔍', replyController),
-              ],
-            ),
-          ),
-          // Reply input row.
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: replyController,
-                    decoration: const InputDecoration(
-                      hintText: 'Escribe una respuesta...',
-                      isDense: true,
-                      border: OutlineInputBorder(),
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(CupertinoIcons.tray, color: colorScheme.primary),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Buzón de Comentarios',
+                    style: textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
                 ),
-                const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(CupertinoIcons.paperplane_fill),
-                  tooltip: 'Enviar respuesta',
-                  onPressed: () => _sendReply(comment),
-                ),
-              ],
-            ),
+                textAlign: TextAlign.center,
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
-          const Divider(),
-        ],
-      ),
+        ),
+        const Divider(height: 1),
+      ],
     );
   }
 
-  /// Builds a suggestion [ActionChip] that fills [controller] with [text].
-  Widget _buildSuggestionChip(String text, TextEditingController controller) {
-    return ActionChip(
-      label: Text(text, style: const TextStyle(fontSize: 12)),
-      visualDensity: VisualDensity.compact,
-      onPressed: () {
-        controller.text = text;
+  /// Builds the scrollable conversation list for the inbox.
+  Widget _buildConversationList() {
+    if (_commentsWithReplies.isEmpty) {
+      return const Center(child: Text('No tienes comentarios aún'));
+    }
+
+    final entries = _commentsWithReplies.entries.toList()
+      ..sort((a, b) => b.key.createdAt.compareTo(a.key.createdAt));
+
+    return ListView.separated(
+      itemCount: entries.length,
+      separatorBuilder: (context, index) =>
+          const Divider(height: 1, indent: 72),
+      itemBuilder: (context, index) {
+        final comment = entries[index].key;
+        final replies = entries[index].value;
+        final replyCount = replies.length;
+        final preview = comment.message.length > 50
+            ? '${comment.message.substring(0, 50)}…'
+            : comment.message;
+        final replyLabel = replyCount == 0
+            ? 'Sin respuesta aún'
+            : '💬 $replyCount respuestas';
+
+        return Card(
+          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: Theme.of(
+                context,
+              ).colorScheme.surfaceContainerHighest,
+              child: const Icon(CupertinoIcons.person_crop_circle_badge_xmark),
+            ),
+            title: const Text('Comentario anónimo'),
+            subtitle: Text(
+              '$preview\n$replyLabel',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            trailing: Text(
+              _formatTime(comment.createdAt),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            isThreeLine: true,
+            onTap: () {
+              Navigator.of(context).push(
+                CupertinoPageRoute(
+                  builder: (_) => CommentChatScreen(
+                    parentComment: comment,
+                    initialReplies: replies,
+                    schedule: _currentWeekSchedule!,
+                    currentUser: widget.currentUser,
+                  ),
+                ),
+              );
+            },
+          ),
+        );
       },
     );
   }
