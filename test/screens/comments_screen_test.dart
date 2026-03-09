@@ -13,7 +13,9 @@ void main() {
   // Helper to wrap CommentsScreen in MaterialApp
   Widget createTestWidget() {
     return const MaterialApp(
-      home: Scaffold(body: CommentsScreen(currentUser: _testUser)),
+      home: Scaffold(
+        body: CommentsScreen(currentUser: _testUser, isResponsible: false),
+      ),
     );
   }
 

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:app_links/app_links.dart';
@@ -7,6 +8,7 @@ import 'package:flutter_cleanapp/core/realtime_service.dart';
 import 'package:flutter_cleanapp/core/supabase_config.dart';
 import 'package:flutter_cleanapp/core/theme/app_theme.dart';
 import 'package:flutter_cleanapp/data/supabase_service.dart';
+import 'package:flutter_cleanapp/models/extension_request.dart';
 import 'package:flutter_cleanapp/models/user_model.dart';
 import 'package:flutter_cleanapp/screens/activities_screen.dart';
 import 'package:flutter_cleanapp/screens/auth_screen.dart';
@@ -34,15 +36,27 @@ class _LimpyAppState extends State<LimpyApp> {
   UserModel? _currentUser;
   bool _isLoadingUser = false;
   bool _pendingPasswordReset = false;
+  bool _isUserResponsible = false;
 
   final _navigatorKey = GlobalKey<NavigatorState>();
   late final AppLinks _appLinks;
+  late final StreamSubscription<void> _schedulesRealtimeSub;
+  late final StreamSubscription<void> _extensionsRealtimeSub;
 
   @override
   void initState() {
     super.initState();
     _checkAuth();
     RealtimeService.instance.subscribe();
+    _schedulesRealtimeSub = RealtimeService.instance.onSchedulesChanged.listen((
+      _,
+    ) {
+      if (mounted) _computeResponsibleStatus();
+    });
+    _extensionsRealtimeSub = RealtimeService.instance.onExtensionsChanged
+        .listen((_) {
+          if (mounted) _computeResponsibleStatus();
+        });
     _appLinks = AppLinks();
     _appLinks.uriLinkStream.listen((uri) {
       _handleDeepLink(uri);
@@ -56,7 +70,8 @@ class _LimpyAppState extends State<LimpyApp> {
         // User arrived via password reset link — show dialog immediately.
         // Set the flag in case the user isn't fully loaded yet.
         _pendingPasswordReset = true;
-        _loadCurrentUser().then((_) {
+        _loadCurrentUser().then((_) async {
+          await _computeResponsibleStatus();
           if (_pendingPasswordReset &&
               _isAuthenticated &&
               _currentUser != null) {
@@ -66,7 +81,8 @@ class _LimpyAppState extends State<LimpyApp> {
       } else if (event == AuthChangeEvent.signedIn ||
           event == AuthChangeEvent.tokenRefreshed ||
           event == AuthChangeEvent.userUpdated) {
-        _loadCurrentUser().then((_) {
+        _loadCurrentUser().then((_) async {
+          await _computeResponsibleStatus();
           if (_pendingPasswordReset &&
               _isAuthenticated &&
               _currentUser != null) {
@@ -78,6 +94,7 @@ class _LimpyAppState extends State<LimpyApp> {
           _isAuthenticated = false;
           _currentUser = null;
           _currentIndex = 2;
+          _isUserResponsible = false;
         });
       }
     });
@@ -85,6 +102,8 @@ class _LimpyAppState extends State<LimpyApp> {
 
   @override
   void dispose() {
+    _schedulesRealtimeSub.cancel();
+    _extensionsRealtimeSub.cancel();
     RealtimeService.instance.dispose();
     super.dispose();
   }
@@ -93,6 +112,7 @@ class _LimpyAppState extends State<LimpyApp> {
     final session = SupabaseConfig.client.auth.currentSession;
     if (session != null && !session.isExpired) {
       await _loadCurrentUser();
+      await _computeResponsibleStatus();
     }
   }
 
@@ -115,6 +135,48 @@ class _LimpyAppState extends State<LimpyApp> {
           _isLoadingUser = false;
         });
       }
+    }
+  }
+
+  Future<void> _computeResponsibleStatus() async {
+    if (_currentUser == null) {
+      if (mounted) setState(() => _isUserResponsible = false);
+      return;
+    }
+    try {
+      final now = DateTime.now();
+      final currentMonday = now.subtract(Duration(days: now.weekday - 1));
+      final currentWeekStart = DateTime(
+        currentMonday.year,
+        currentMonday.month,
+        currentMonday.day,
+      );
+      final currentWeekEnd = currentWeekStart.add(const Duration(days: 7));
+
+      final schedules = await SupabaseService.instance.getSchedules();
+      final schedule = schedules.where((s) {
+        return s.userId == _currentUser!.id &&
+            !s.date.isBefore(currentWeekStart) &&
+            s.date.isBefore(currentWeekEnd);
+      }).firstOrNull;
+
+      bool isResponsible = schedule != null;
+
+      if (isResponsible) {
+        final extensions = await SupabaseService.instance
+            .getExtensionRequestsForUser(_currentUser!.id);
+        final hasAcceptedProrroga = extensions.any(
+          (e) =>
+              e.status == ExtensionRequestStatus.accepted &&
+              e.requesterId == _currentUser!.id &&
+              e.scheduleId == schedule.id,
+        );
+        if (hasAcceptedProrroga) isResponsible = false;
+      }
+
+      if (mounted) setState(() => _isUserResponsible = isResponsible);
+    } catch (_) {
+      if (mounted) setState(() => _isUserResponsible = false);
     }
   }
 
@@ -273,12 +335,18 @@ class _LimpyAppState extends State<LimpyApp> {
 
   List<Widget> get _screens => [
     CalendarScreen(currentUser: _currentUser!),
-    ActivitiesScreen(currentUser: _currentUser!),
+    ActivitiesScreen(
+      currentUser: _currentUser!,
+      isResponsible: _isUserResponsible,
+    ),
     HomeScreen(
       currentUser: _currentUser!,
       onNavigateToActivities: () => setState(() => _currentIndex = 1),
     ),
-    CommentsScreen(currentUser: _currentUser!),
+    CommentsScreen(
+      currentUser: _currentUser!,
+      isResponsible: _isUserResponsible,
+    ),
     SettingsScreen(
       currentUser: _currentUser!,
       onProfileChanged: _loadCurrentUser,

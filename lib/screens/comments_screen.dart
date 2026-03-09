@@ -19,8 +19,17 @@ class CommentsScreen extends StatefulWidget {
   /// The currently authenticated user.
   final UserModel currentUser;
 
+  /// Whether the current user is responsible for cleaning this week.
+  ///
+  /// Computed centrally in app.dart and passed down to avoid redundant queries.
+  final bool isResponsible;
+
   /// Creates a [CommentsScreen].
-  const CommentsScreen({super.key, required this.currentUser});
+  const CommentsScreen({
+    super.key,
+    required this.currentUser,
+    required this.isResponsible,
+  });
 
   @override
   State<CommentsScreen> createState() => _CommentsScreenState();
@@ -87,8 +96,7 @@ class _CommentsScreenState extends State<CommentsScreen> {
         );
       }
 
-      final isResponsible =
-          schedule != null && schedule.userId == widget.currentUser.id;
+      final isResponsible = widget.isResponsible;
 
       Map<Comment, List<Comment>> commentsWithReplies = {};
       Map<Comment, List<Comment>> myComments = {};

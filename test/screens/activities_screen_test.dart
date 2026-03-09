@@ -21,7 +21,9 @@ void main() {
     testWidgets('shows loading indicator initially', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
-          home: Scaffold(body: ActivitiesScreen(currentUser: _testUser)),
+          home: Scaffold(
+            body: ActivitiesScreen(currentUser: _testUser, isResponsible: true),
+          ),
         ),
       );
       // Before pumpAndSettle — should show loading indicator
@@ -31,7 +33,12 @@ void main() {
     testWidgets('can be constructed with regular user', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
-          home: Scaffold(body: ActivitiesScreen(currentUser: _testUser)),
+          home: Scaffold(
+            body: ActivitiesScreen(
+              currentUser: _testUser,
+              isResponsible: false,
+            ),
+          ),
         ),
       );
       expect(find.byType(ActivitiesScreen), findsOneWidget);
@@ -40,7 +47,12 @@ void main() {
     testWidgets('can be constructed with admin user', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
-          home: Scaffold(body: ActivitiesScreen(currentUser: _testAdmin)),
+          home: Scaffold(
+            body: ActivitiesScreen(
+              currentUser: _testAdmin,
+              isResponsible: false,
+            ),
+          ),
         ),
       );
       expect(find.byType(ActivitiesScreen), findsOneWidget);
@@ -51,7 +63,12 @@ void main() {
     ) async {
       await tester.pumpWidget(
         const MaterialApp(
-          home: Scaffold(body: ActivitiesScreen(currentUser: _testUser)),
+          home: Scaffold(
+            body: ActivitiesScreen(
+              currentUser: _testUser,
+              isResponsible: false,
+            ),
+          ),
         ),
       );
       // Loading state — no Finalizar button yet
