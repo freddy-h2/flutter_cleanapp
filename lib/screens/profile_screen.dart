@@ -10,8 +10,15 @@ class ProfileScreen extends StatefulWidget {
   /// The current user whose profile is being edited.
   final UserModel currentUser;
 
+  /// Called after a successful profile save so the parent can refresh data.
+  final VoidCallback? onProfileChanged;
+
   /// Creates a [ProfileScreen].
-  const ProfileScreen({super.key, required this.currentUser});
+  const ProfileScreen({
+    super.key,
+    required this.currentUser,
+    this.onProfileChanged,
+  });
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -63,10 +70,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         room: _roomController.text.trim(),
       );
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Perfil actualizado')));
-        Navigator.pop(context, true); // Return true to signal changes
+        widget.onProfileChanged?.call();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Perfil actualizado exitosamente')),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -202,222 +209,213 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Administrar Perfil'),
-        leading: BackButton(onPressed: () => Navigator.pop(context)),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Avatar/icon
-              Center(
-                child: CircleAvatar(
-                  radius: 48,
-                  child: Text(
-                    widget.currentUser.name.isNotEmpty
-                        ? widget.currentUser.name[0].toUpperCase()
-                        : '?',
-                    style: Theme.of(context).textTheme.headlineLarge,
-                  ),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Avatar/icon
+            Center(
+              child: CircleAvatar(
+                radius: 48,
+                child: Text(
+                  widget.currentUser.name.isNotEmpty
+                      ? widget.currentUser.name[0].toUpperCase()
+                      : '?',
+                  style: Theme.of(context).textTheme.headlineLarge,
                 ),
               ),
-              const SizedBox(height: 24),
-              // Email (read-only)
-              TextFormField(
-                initialValue:
-                    SupabaseConfig.client.auth.currentUser?.email ?? '',
-                decoration: const InputDecoration(
-                  labelText: 'Correo electronico',
-                  prefixIcon: Icon(Icons.email),
-                ),
-                readOnly: true,
-                enabled: false,
+            ),
+            const SizedBox(height: 24),
+            // Email (read-only)
+            TextFormField(
+              initialValue: SupabaseConfig.client.auth.currentUser?.email ?? '',
+              decoration: const InputDecoration(
+                labelText: 'Correo electronico',
+                prefixIcon: Icon(Icons.email),
               ),
-              const SizedBox(height: 16),
-              // Name
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Nombre completo',
-                  prefixIcon: Icon(Icons.person),
-                ),
-                validator: (v) => (v == null || v.trim().isEmpty)
-                    ? 'Ingresa tu nombre'
-                    : null,
+              readOnly: true,
+              enabled: false,
+            ),
+            const SizedBox(height: 16),
+            // Name
+            TextFormField(
+              controller: _nameController,
+              decoration: const InputDecoration(
+                labelText: 'Nombre completo',
+                prefixIcon: Icon(Icons.person),
               ),
-              const SizedBox(height: 16),
-              // Room
-              TextFormField(
-                controller: _roomController,
-                decoration: const InputDecoration(
-                  labelText: 'Cuarto',
-                  prefixIcon: Icon(Icons.meeting_room),
-                  hintText: 'Ej: Cuarto 3A',
-                ),
-                validator: (v) => (v == null || v.trim().isEmpty)
-                    ? 'Ingresa tu cuarto'
-                    : null,
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? 'Ingresa tu nombre' : null,
+            ),
+            const SizedBox(height: 16),
+            // Room
+            TextFormField(
+              controller: _roomController,
+              decoration: const InputDecoration(
+                labelText: 'Cuarto',
+                prefixIcon: Icon(Icons.meeting_room),
+                hintText: 'Ej: Cuarto 3A',
               ),
-              const SizedBox(height: 32),
-              // Save button
-              SizedBox(
-                height: 48,
-                child: FilledButton(
-                  onPressed: (_hasChanges && !_isSaving) ? _save : null,
-                  child: _isSaving
-                      ? const CircularProgressIndicator()
-                      : const Text('Guardar cambios'),
-                ),
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? 'Ingresa tu cuarto' : null,
+            ),
+            const SizedBox(height: 32),
+            // Save button
+            SizedBox(
+              height: 48,
+              child: FilledButton(
+                onPressed: (_hasChanges && !_isSaving) ? _save : null,
+                child: _isSaving
+                    ? const CircularProgressIndicator()
+                    : const Text('Guardar cambios'),
               ),
+            ),
 
-              const SizedBox(height: 32),
-              const Divider(),
-              const SizedBox(height: 16),
+            const SizedBox(height: 32),
+            const Divider(),
+            const SizedBox(height: 16),
 
-              // ── Change Password section ──────────────────────────────
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        'Cambiar Contraseña',
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.bold),
+            // ── Change Password section ──────────────────────────────
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Cambiar Contraseña',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
                       ),
-                      const SizedBox(height: 16),
-                      // Current password
-                      TextFormField(
-                        controller: _currentPasswordController,
-                        obscureText: _obscureCurrentPassword,
-                        decoration: InputDecoration(
-                          labelText: 'Contraseña actual',
-                          prefixIcon: const Icon(Icons.lock_outline),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscureCurrentPassword
-                                  ? Icons.visibility_outlined
-                                  : Icons.visibility_off_outlined,
-                            ),
-                            onPressed: () => setState(
-                              () => _obscureCurrentPassword =
-                                  !_obscureCurrentPassword,
-                            ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Current password
+                    TextFormField(
+                      controller: _currentPasswordController,
+                      obscureText: _obscureCurrentPassword,
+                      decoration: InputDecoration(
+                        labelText: 'Contraseña actual',
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscureCurrentPassword
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
+                          ),
+                          onPressed: () => setState(
+                            () => _obscureCurrentPassword =
+                                !_obscureCurrentPassword,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      // New password
-                      TextFormField(
-                        controller: _newPasswordController,
-                        obscureText: _obscureNewPassword,
-                        decoration: InputDecoration(
-                          labelText: 'Nueva contraseña',
-                          prefixIcon: const Icon(Icons.lock),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscureNewPassword
-                                  ? Icons.visibility_outlined
-                                  : Icons.visibility_off_outlined,
-                            ),
-                            onPressed: () => setState(
-                              () => _obscureNewPassword = !_obscureNewPassword,
-                            ),
+                    ),
+                    const SizedBox(height: 12),
+                    // New password
+                    TextFormField(
+                      controller: _newPasswordController,
+                      obscureText: _obscureNewPassword,
+                      decoration: InputDecoration(
+                        labelText: 'Nueva contraseña',
+                        prefixIcon: const Icon(Icons.lock),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscureNewPassword
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
+                          ),
+                          onPressed: () => setState(
+                            () => _obscureNewPassword = !_obscureNewPassword,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      // Confirm new password
-                      TextFormField(
-                        controller: _confirmPasswordController,
-                        obscureText: _obscureConfirmPassword,
-                        decoration: InputDecoration(
-                          labelText: 'Confirmar nueva contraseña',
-                          prefixIcon: const Icon(Icons.lock),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscureConfirmPassword
-                                  ? Icons.visibility_outlined
-                                  : Icons.visibility_off_outlined,
-                            ),
-                            onPressed: () => setState(
-                              () => _obscureConfirmPassword =
-                                  !_obscureConfirmPassword,
-                            ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Confirm new password
+                    TextFormField(
+                      controller: _confirmPasswordController,
+                      obscureText: _obscureConfirmPassword,
+                      decoration: InputDecoration(
+                        labelText: 'Confirmar nueva contraseña',
+                        prefixIcon: const Icon(Icons.lock),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscureConfirmPassword
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
+                          ),
+                          onPressed: () => setState(
+                            () => _obscureConfirmPassword =
+                                !_obscureConfirmPassword,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        height: 48,
-                        child: FilledButton(
-                          onPressed: _isChangingPassword
-                              ? null
-                              : _changePassword,
-                          child: _isChangingPassword
-                              ? const CircularProgressIndicator()
-                              : const Text('Cambiar Contraseña'),
-                        ),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      height: 48,
+                      child: FilledButton(
+                        onPressed: _isChangingPassword ? null : _changePassword,
+                        child: _isChangingPassword
+                            ? const CircularProgressIndicator()
+                            : const Text('Cambiar Contraseña'),
                       ),
-                      const SizedBox(height: 8),
-                      TextButton(
-                        onPressed: _forgotPassword,
-                        child: const Text('¿Olvidaste tu contraseña?'),
-                      ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: _forgotPassword,
+                      child: const Text('¿Olvidaste tu contraseña?'),
+                    ),
+                  ],
                 ),
               ),
+            ),
 
-              const SizedBox(height: 16),
-              const Divider(),
-              const SizedBox(height: 16),
+            const SizedBox(height: 16),
+            const Divider(),
+            const SizedBox(height: 16),
 
-              // ── Change Email section ─────────────────────────────────
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        'Cambiar Correo Electrónico',
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.bold),
+            // ── Change Email section ─────────────────────────────────
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Cambiar Correo Electrónico',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
                       ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _newEmailController,
-                        keyboardType: TextInputType.emailAddress,
-                        decoration: const InputDecoration(
-                          labelText: 'Nuevo correo electrónico',
-                          prefixIcon: Icon(Icons.email_outlined),
-                        ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _newEmailController,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: const InputDecoration(
+                        labelText: 'Nuevo correo electrónico',
+                        prefixIcon: Icon(Icons.email_outlined),
                       ),
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        height: 48,
-                        child: OutlinedButton(
-                          onPressed: _isChangingEmail ? null : _changeEmail,
-                          child: _isChangingEmail
-                              ? const CircularProgressIndicator()
-                              : const Text('Solicitar cambio'),
-                        ),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      height: 48,
+                      child: OutlinedButton(
+                        onPressed: _isChangingEmail ? null : _changeEmail,
+                        child: _isChangingEmail
+                            ? const CircularProgressIndicator()
+                            : const Text('Solicitar cambio'),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
+            ),
 
-              const SizedBox(height: 24),
-            ],
-          ),
+            const SizedBox(height: 24),
+          ],
         ),
       ),
     );

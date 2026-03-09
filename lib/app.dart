@@ -25,7 +25,7 @@ class LimpyApp extends StatefulWidget {
 
 class _LimpyAppState extends State<LimpyApp> {
   AppThemeMode _themeMode = AppThemeMode.system;
-  int _currentIndex = 0;
+  int _currentIndex = 2;
 
   bool _isAuthenticated = false;
   UserModel? _currentUser;
@@ -56,7 +56,7 @@ class _LimpyAppState extends State<LimpyApp> {
         setState(() {
           _isAuthenticated = false;
           _currentUser = null;
-          _currentIndex = 0;
+          _currentIndex = 2;
         });
       }
     });
@@ -104,11 +104,7 @@ class _LimpyAppState extends State<LimpyApp> {
   void _handleDeepLink(Uri uri) {
     if (uri.scheme == 'limpy' && uri.host == 'reset-callback') {
       if (_isAuthenticated && _currentUser != null) {
-        _navigatorKey.currentState?.push(
-          MaterialPageRoute(
-            builder: (_) => ProfileScreen(currentUser: _currentUser!),
-          ),
-        );
+        setState(() => _currentIndex = 4);
       }
     }
   }
@@ -161,13 +157,17 @@ class _LimpyAppState extends State<LimpyApp> {
   }
 
   List<Widget> get _screens => [
-    HomeScreen(
-      currentUser: _currentUser!,
-      onNavigateToActivities: () => setState(() => _currentIndex = 1),
-    ),
     ActivitiesScreen(currentUser: _currentUser!),
     CalendarScreen(currentUser: _currentUser!),
+    HomeScreen(
+      currentUser: _currentUser!,
+      onNavigateToActivities: () => setState(() => _currentIndex = 0),
+    ),
     CommentsScreen(currentUser: _currentUser!),
+    ProfileScreen(
+      currentUser: _currentUser!,
+      onProfileChanged: _loadCurrentUser,
+    ),
   ];
 
   void _toggleTheme() {
@@ -236,17 +236,6 @@ class _LimpyAppState extends State<LimpyApp> {
               switch (value) {
                 case 'theme':
                   _toggleTheme();
-                case 'profile':
-                  _navigatorKey.currentState
-                      ?.push<bool>(
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              ProfileScreen(currentUser: _currentUser!),
-                        ),
-                      )
-                      .then((changed) {
-                        if (changed == true && mounted) _loadCurrentUser();
-                      });
                 case 'feedback':
                   _showFeedbackDialog();
                 case 'admin_feedback':
@@ -265,16 +254,6 @@ class _LimpyAppState extends State<LimpyApp> {
                     Icon(_themeModeIcon),
                     const SizedBox(width: 12),
                     const Text('Cambiar tema'),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'profile',
-                child: const Row(
-                  children: [
-                    Icon(Icons.person),
-                    SizedBox(width: 12),
-                    Text('Administrar perfil'),
                   ],
                 ),
               ),
@@ -344,11 +323,6 @@ class _LimpyAppState extends State<LimpyApp> {
             height: 70,
             destinations: const [
               NavigationDestination(
-                icon: Icon(Icons.home_outlined),
-                selectedIcon: Icon(Icons.home),
-                label: 'Inicio',
-              ),
-              NavigationDestination(
                 icon: Icon(Icons.checklist_outlined),
                 selectedIcon: Icon(Icons.checklist),
                 label: 'Actividades',
@@ -359,9 +333,19 @@ class _LimpyAppState extends State<LimpyApp> {
                 label: 'Calendario',
               ),
               NavigationDestination(
+                icon: Icon(Icons.home_outlined),
+                selectedIcon: Icon(Icons.home),
+                label: 'Inicio',
+              ),
+              NavigationDestination(
                 icon: Icon(Icons.comment_outlined),
                 selectedIcon: Icon(Icons.comment),
                 label: 'Comentarios',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.person_outline),
+                selectedIcon: Icon(Icons.person),
+                label: 'Perfil',
               ),
             ],
           ),
