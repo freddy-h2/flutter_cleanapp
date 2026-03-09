@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_cleanapp/data/supabase_service.dart';
+import 'package:flutter_cleanapp/models/cleaning_schedule.dart';
 import 'package:flutter_cleanapp/models/extension_request.dart';
 import 'package:flutter_cleanapp/models/user_model.dart';
 
@@ -19,6 +20,7 @@ class ExtensionRequestsScreen extends StatefulWidget {
 class _ExtensionRequestsScreenState extends State<ExtensionRequestsScreen> {
   List<ExtensionRequest> _requests = [];
   List<UserModel> _users = [];
+  List<CleaningSchedule> _schedules = [];
   bool _isLoading = true;
 
   @override
@@ -33,11 +35,13 @@ class _ExtensionRequestsScreenState extends State<ExtensionRequestsScreen> {
       final results = await Future.wait([
         SupabaseService.instance.getAllExtensionRequests(),
         SupabaseService.instance.getUsers(),
+        SupabaseService.instance.getSchedules(),
       ]);
       if (mounted) {
         setState(() {
           _requests = results[0] as List<ExtensionRequest>;
           _users = results[1] as List<UserModel>;
+          _schedules = results[2] as List<CleaningSchedule>;
           _isLoading = false;
         });
       }
@@ -72,6 +76,39 @@ class _ExtensionRequestsScreenState extends State<ExtensionRequestsScreen> {
     final month = date.month.toString().padLeft(2, '0');
     final year = date.year.toString();
     return '$day/$month/$year';
+  }
+
+  String _periodDates(String scheduleId) {
+    final anchor = _schedules.where((s) => s.id == scheduleId).firstOrNull;
+    if (anchor == null) return '?';
+
+    final sorted = List<CleaningSchedule>.from(_schedules)
+      ..sort((a, b) => a.date.compareTo(b.date));
+    final anchorIdx = sorted.indexWhere((s) => s.id == scheduleId);
+    if (anchorIdx == -1) return _formatDate(anchor.date);
+
+    final userId = anchor.userId;
+    var startIdx = anchorIdx;
+    var endIdx = anchorIdx;
+
+    // Walk backward
+    while (startIdx > 0 &&
+        sorted[startIdx - 1].userId == userId &&
+        sorted[startIdx].date.difference(sorted[startIdx - 1].date).inDays <=
+            1) {
+      startIdx--;
+    }
+    // Walk forward
+    while (endIdx < sorted.length - 1 &&
+        sorted[endIdx + 1].userId == userId &&
+        sorted[endIdx + 1].date.difference(sorted[endIdx].date).inDays <= 1) {
+      endIdx++;
+    }
+
+    final firstDate = sorted[startIdx].date;
+    final lastDate = sorted[endIdx].date;
+    if (firstDate == lastDate) return _formatDate(firstDate);
+    return '${_formatDate(firstDate)} al ${_formatDate(lastDate)}';
   }
 
   Color _statusColor(ExtensionRequestStatus status) => switch (status) {
@@ -165,7 +202,7 @@ class _ExtensionRequestsScreenState extends State<ExtensionRequestsScreen> {
                     ),
                     title: Text('$requesterName → $nextUserName'),
                     subtitle: Text(
-                      'Semana del ${_formatDate(request.createdAt)}'
+                      'Periodo: ${_periodDates(request.scheduleId)}'
                       ' · ${request.status.label}'
                       '${_userRoom(request.requesterId).isNotEmpty ? '\n${_userRoom(request.requesterId)}' : ''}',
                     ),
