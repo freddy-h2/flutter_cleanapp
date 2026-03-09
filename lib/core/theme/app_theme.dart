@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -94,6 +95,10 @@ abstract final class AppTheme {
       brightness: Brightness.dark,
     ),
     scaffoldBackgroundColor: Colors.black,
+    cupertinoOverrideTheme: const CupertinoThemeData(
+      barBackgroundColor: Colors.black,
+      brightness: Brightness.dark,
+    ),
     textTheme: GoogleFonts.interTextTheme(
       ThemeData(brightness: Brightness.dark).textTheme,
     ),

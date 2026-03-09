@@ -386,7 +386,13 @@ class _LimpyAppState extends State<LimpyApp> {
             ? Brightness.dark
             : null,
         border: null,
-        // Disable route transition hero animation which adds its own blur.
+        // In dark mode, disable automatic background visibility which lerps
+        // the bar color with the scaffold background (overriding our black).
+        // Also disable the internal backdrop filter blur.
+        automaticBackgroundVisibility:
+            Theme.of(context).brightness != Brightness.dark,
+        enableBackgroundFilterBlur:
+            Theme.of(context).brightness != Brightness.dark,
         transitionBetweenRoutes: false,
       ),
       body: IndexedStack(index: _currentIndex, children: _screens),
