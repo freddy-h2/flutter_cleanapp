@@ -97,9 +97,9 @@ abstract final class AppTheme {
     scaffoldBackgroundColor: Colors.black,
     cupertinoOverrideTheme: const CupertinoThemeData(
       brightness: Brightness.dark,
-      barBackgroundColor: Color(0xDD121212),
+      barBackgroundColor: Color(0xCC1C1C1E),
       scaffoldBackgroundColor: Colors.black,
-      primaryColor: CupertinoColors.activeBlue,
+      primaryColor: Color(0xFF0A84FF),
       textTheme: CupertinoTextThemeData(
         navTitleTextStyle: TextStyle(
           color: Colors.white,
@@ -127,7 +127,8 @@ abstract final class AppTheme {
       ).onSurfaceVariant,
     ),
     cardTheme: const CardThemeData(
-      elevation: 1,
+      elevation: 0,
+      color: Color(0xFF1C1C1E),
       shape: ContinuousRectangleBorder(
         borderRadius: BorderRadius.all(Radius.circular(40)),
       ),
@@ -144,6 +145,8 @@ abstract final class AppTheme {
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
+        backgroundColor: const Color(0xFF0A84FF),
+        foregroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
       ),
@@ -172,7 +175,7 @@ abstract final class AppTheme {
     appBarTheme: const AppBarTheme(
       centerTitle: true,
       scrolledUnderElevation: 0,
-      backgroundColor: Colors.black,
+      backgroundColor: Color(0xFF1C1C1E),
       foregroundColor: Colors.white,
       surfaceTintColor: Colors.transparent,
     ),

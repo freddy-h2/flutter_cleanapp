@@ -454,7 +454,7 @@ class _LimpyAppState extends State<LimpyApp> {
       value: isDark
           ? SystemUiOverlayStyle.light.copyWith(
               statusBarColor: Colors.transparent,
-              systemNavigationBarColor: Colors.black,
+              systemNavigationBarColor: const Color(0xFF1C1C1E),
             )
           : SystemUiOverlayStyle.dark.copyWith(
               statusBarColor: Colors.transparent,
@@ -462,18 +462,24 @@ class _LimpyAppState extends State<LimpyApp> {
             ),
       child: Scaffold(
         appBar: CupertinoNavigationBar(
-          middle: Text(_currentTitle),
+          middle: Text(
+            _currentTitle,
+            style: isDark ? const TextStyle(color: Colors.white) : null,
+          ),
           trailing: CupertinoButton(
             padding: EdgeInsets.zero,
-            child: const Icon(CupertinoIcons.bell),
+            child: Icon(
+              CupertinoIcons.bell,
+              color: isDark ? Colors.white : null,
+            ),
             onPressed: () {
               _navigatorKey.currentState?.push(
                 CupertinoPageRoute(builder: (_) => const NotificationsScreen()),
               );
             },
           ),
-          backgroundColor: Theme.of(context).brightness == Brightness.dark
-              ? const Color(0xFF000000)
+          backgroundColor: isDark
+              ? const Color(0xCC1C1C1E)
               : Theme.of(context).colorScheme.surface.withValues(alpha: 0.85),
           border: null,
           transitionBetweenRoutes: false,
@@ -498,24 +504,22 @@ class _LimpyAppState extends State<LimpyApp> {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(28),
             child: BackdropFilter(
-              filter: Theme.of(context).brightness == Brightness.dark
-                  ? ImageFilter.blur(sigmaX: 0, sigmaY: 0)
-                  : ImageFilter.blur(sigmaX: 20.0, sigmaY: 20.0),
+              filter: ImageFilter.blur(sigmaX: 20.0, sigmaY: 20.0),
               child: CupertinoTabBar(
                 currentIndex: _currentIndex,
                 onTap: (index) => setState(() => _currentIndex = index),
-                activeColor: CupertinoColors.activeBlue,
-                backgroundColor: Theme.of(context).brightness == Brightness.dark
-                    ? Colors.black
+                activeColor: isDark
+                    ? const Color(0xFF0A84FF)
+                    : CupertinoColors.activeBlue,
+                backgroundColor: isDark
+                    ? const Color(0xCC1C1C1E)
                     : Theme.of(
                         context,
                       ).colorScheme.surface.withValues(alpha: 0.7),
-                inactiveColor: Theme.of(context).brightness == Brightness.dark
-                    ? CupertinoColors.systemGrey
+                inactiveColor: isDark
+                    ? const Color(0xFF8E8E93)
                     : CupertinoColors.inactiveGray,
-                border: Theme.of(context).brightness == Brightness.dark
-                    ? const Border()
-                    : null,
+                border: isDark ? const Border() : null,
                 items: const [
                   BottomNavigationBarItem(
                     icon: Icon(CupertinoIcons.calendar),
