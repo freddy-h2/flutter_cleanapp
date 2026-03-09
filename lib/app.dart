@@ -193,6 +193,15 @@ class _LimpyAppState extends State<LimpyApp> {
     AppThemeMode.system => ThemeMode.system,
   };
 
+  String get _currentTitle => switch (_currentIndex) {
+    0 => 'Calendario',
+    1 => 'Actividades',
+    2 => 'Limpy',
+    3 => 'Comentarios',
+    4 => 'Configuración',
+    _ => 'Limpy',
+  };
+
   IconData get _themeModeIcon => switch (_themeMode) {
     AppThemeMode.system => CupertinoIcons.circle_lefthalf_fill,
     AppThemeMode.light => CupertinoIcons.sun_max_fill,
@@ -238,7 +247,7 @@ class _LimpyAppState extends State<LimpyApp> {
   Widget _buildMainShell() {
     return Scaffold(
       appBar: CupertinoNavigationBar(
-        middle: const Text('Limpy'),
+        middle: Text(_currentTitle),
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,
           child: const Icon(CupertinoIcons.bell),
@@ -268,27 +277,27 @@ class _LimpyAppState extends State<LimpyApp> {
               BottomNavigationBarItem(
                 icon: Icon(CupertinoIcons.calendar),
                 activeIcon: Icon(CupertinoIcons.calendar_today),
-                label: 'Calendario',
+                label: '',
               ),
               BottomNavigationBarItem(
                 icon: Icon(CupertinoIcons.checkmark_square),
                 activeIcon: Icon(CupertinoIcons.checkmark_square_fill),
-                label: 'Actividades',
+                label: '',
               ),
               BottomNavigationBarItem(
                 icon: Icon(CupertinoIcons.house),
                 activeIcon: Icon(CupertinoIcons.house_fill),
-                label: 'Inicio',
+                label: '',
               ),
               BottomNavigationBarItem(
                 icon: Icon(CupertinoIcons.chat_bubble_2),
                 activeIcon: Icon(CupertinoIcons.chat_bubble_2_fill),
-                label: 'Comentarios',
+                label: '',
               ),
               BottomNavigationBarItem(
                 icon: Icon(CupertinoIcons.gear),
                 activeIcon: Icon(CupertinoIcons.gear_solid),
-                label: 'Configuración',
+                label: '',
               ),
             ],
           ),
