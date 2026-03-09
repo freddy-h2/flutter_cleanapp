@@ -86,6 +86,42 @@ class _FeedbackScreenState extends State<FeedbackScreen>
     }
   }
 
+  Future<void> _deleteAnnouncement(String announcementId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Eliminar comunicado'),
+        content: const Text(
+          '¿Estás seguro de que deseas eliminar este comunicado? Esta acción no se puede deshacer.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await SupabaseService.instance.deleteAnnouncement(announcementId);
+      await _loadData();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error al eliminar: $e')));
+      }
+    }
+  }
+
   Future<void> _showCreateAnnouncementDialog() async {
     final titleController = TextEditingController();
     final messageController = TextEditingController();
@@ -290,9 +326,26 @@ class _FeedbackScreenState extends State<FeedbackScreen>
                                 ),
                               ),
                               if (!item.isActive)
-                                const Chip(
-                                  label: Text('Inactivo'),
-                                  visualDensity: VisualDensity.compact,
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Chip(
+                                      label: Text('Inactivo'),
+                                      visualDensity: VisualDensity.compact,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    IconButton(
+                                      icon: Icon(
+                                        Icons.delete_outline,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.error,
+                                      ),
+                                      tooltip: 'Eliminar',
+                                      onPressed: () =>
+                                          _deleteAnnouncement(item.id),
+                                    ),
+                                  ],
                                 )
                               else
                                 TextButton(

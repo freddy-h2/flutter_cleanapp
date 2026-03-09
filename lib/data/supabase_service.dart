@@ -630,4 +630,14 @@ class SupabaseService {
         .update({'is_active': false})
         .eq('id', announcementId);
   }
+
+  /// Deletes an announcement (admin only).
+  ///
+  /// Should only be called on inactive announcements.
+  Future<void> deleteAnnouncement(String announcementId) async {
+    await SupabaseConfig.client
+        .from('announcements')
+        .delete()
+        .eq('id', announcementId);
+  }
 }

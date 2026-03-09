@@ -282,8 +282,17 @@ class _HomeScreenState extends State<HomeScreen> {
   /// Loads active announcements and fires system notifications for new ones.
   Future<void> _loadAnnouncements() async {
     try {
-      final announcements = await SupabaseService.instance
-          .getActiveAnnouncements();
+      final allActive = await SupabaseService.instance.getActiveAnnouncements();
+
+      // Filter out update announcements older than 7 days
+      final now = DateTime.now();
+      final announcements = allActive.where((a) {
+        if (a.type == AnnouncementType.update) {
+          return now.difference(a.createdAt).inDays < 7;
+        }
+        return true; // avisos don't auto-expire
+      }).toList();
+
       if (mounted) {
         for (final a in announcements) {
           if (!_dismissedAnnouncementIds.contains(a.id) &&
