@@ -402,10 +402,14 @@ class SupabaseService {
   /// [sortedSchedules] must be sorted by date ascending. Walks backward and
   /// forward from [anchor] collecting schedules that belong to the same user
   /// and are consecutive (date difference ≤ 1 day).
+  ///
+  /// If [maxSize] is provided, the result is capped to at most [maxSize]
+  /// entries centered around the anchor.
   List<CleaningSchedule> _findPeriodSchedules(
     List<CleaningSchedule> sortedSchedules,
-    CleaningSchedule anchor,
-  ) {
+    CleaningSchedule anchor, {
+    int? maxSize,
+  }) {
     final anchorIndex = sortedSchedules.indexWhere((s) => s.id == anchor.id);
     if (anchorIndex == -1) return [anchor];
 
@@ -420,10 +424,12 @@ class SupabaseService {
           .inDays;
       if (diff > 1) break;
       result.insert(0, sortedSchedules[i]);
+      if (maxSize != null && result.length >= maxSize) break;
     }
 
     // Walk forward.
     for (var i = anchorIndex + 1; i < sortedSchedules.length; i++) {
+      if (maxSize != null && result.length >= maxSize) break;
       if (sortedSchedules[i].userId != userId) break;
       final diff = sortedSchedules[i].date
           .difference(sortedSchedules[i - 1].date)
@@ -467,8 +473,12 @@ class SupabaseService {
     if (anchorIndex == -1) return;
     final anchor = schedules[anchorIndex];
 
-    // Find the requester's full period around the anchor.
-    final requesterPeriod = _findPeriodSchedules(schedules, anchor);
+    // Find the requester's full period around the anchor (capped).
+    final requesterPeriod = _findPeriodSchedules(
+      schedules,
+      anchor,
+      maxSize: cleaningPeriodDays,
+    );
 
     // Find the next user's period — first consecutive group after requester's
     // period end date.
@@ -491,7 +501,11 @@ class SupabaseService {
 
     // Swap next user's period: set all rows to requesterId.
     if (nextAnchor != null) {
-      final nextUserPeriod = _findPeriodSchedules(schedules, nextAnchor);
+      final nextUserPeriod = _findPeriodSchedules(
+        schedules,
+        nextAnchor,
+        maxSize: cleaningPeriodDays,
+      );
       for (final s in nextUserPeriod) {
         await SupabaseConfig.client
             .from('schedules')

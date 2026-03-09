@@ -5,8 +5,9 @@ import 'package:flutter_cleanapp/models/cleaning_schedule.dart';
 /// for unit testing purposes.
 List<CleaningSchedule> findPeriodSchedules(
   List<CleaningSchedule> sortedSchedules,
-  CleaningSchedule anchor,
-) {
+  CleaningSchedule anchor, {
+  int? maxSize,
+}) {
   final anchorIndex = sortedSchedules.indexWhere((s) => s.id == anchor.id);
   if (anchorIndex == -1) return [anchor];
 
@@ -21,10 +22,12 @@ List<CleaningSchedule> findPeriodSchedules(
         .inDays;
     if (diff > 1) break;
     result.insert(0, sortedSchedules[i]);
+    if (maxSize != null && result.length >= maxSize) break;
   }
 
   // Walk forward
   for (var i = anchorIndex + 1; i < sortedSchedules.length; i++) {
+    if (maxSize != null && result.length >= maxSize) break;
     if (sortedSchedules[i].userId != userId) break;
     final diff = sortedSchedules[i].date
         .difference(sortedSchedules[i - 1].date)
@@ -240,5 +243,55 @@ void main() {
       // No next user period found — nextAnchor is null, no crash
       expect(nextAnchor, isNull);
     });
+
+    test('maxSize caps result — 5 consecutive same-user schedules, maxSize=3, '
+        'anchor at middle returns 3', () {
+      final schedules = [
+        _schedule('s1', 'userA', DateTime(2026, 3, 1)),
+        _schedule('s2', 'userA', DateTime(2026, 3, 2)),
+        _schedule('s3', 'userA', DateTime(2026, 3, 3)), // anchor (middle)
+        _schedule('s4', 'userA', DateTime(2026, 3, 4)),
+        _schedule('s5', 'userA', DateTime(2026, 3, 5)),
+      ];
+      final anchor = schedules[2]; // s3 at middle
+      final result = findPeriodSchedules(schedules, anchor, maxSize: 3);
+      expect(result.length, 3);
+    });
+
+    test(
+      'maxSize null behaves as before — no cap, returns all consecutive',
+      () {
+        final schedules = [
+          _schedule('s1', 'userA', DateTime(2026, 3, 1)),
+          _schedule('s2', 'userA', DateTime(2026, 3, 2)),
+          _schedule('s3', 'userA', DateTime(2026, 3, 3)),
+          _schedule('s4', 'userA', DateTime(2026, 3, 4)),
+          _schedule('s5', 'userA', DateTime(2026, 3, 5)),
+        ];
+        final anchor = schedules[2]; // s3 at middle
+        final result = findPeriodSchedules(schedules, anchor);
+        expect(result.map((s) => s.id).toList(), [
+          's1',
+          's2',
+          's3',
+          's4',
+          's5',
+        ]);
+      },
+    );
+
+    test(
+      'maxSize larger than period — period has 3 entries, maxSize=5 returns 3',
+      () {
+        final schedules = [
+          _schedule('s1', 'userA', DateTime(2026, 3, 1)),
+          _schedule('s2', 'userA', DateTime(2026, 3, 2)),
+          _schedule('s3', 'userA', DateTime(2026, 3, 3)),
+        ];
+        final anchor = schedules[1]; // s2 at middle
+        final result = findPeriodSchedules(schedules, anchor, maxSize: 5);
+        expect(result.map((s) => s.id).toList(), ['s1', 's2', 's3']);
+      },
+    );
   });
 }
