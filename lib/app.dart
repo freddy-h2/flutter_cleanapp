@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_cleanapp/core/realtime_service.dart';
 import 'package:flutter_cleanapp/core/supabase_config.dart';
 import 'package:flutter_cleanapp/core/theme/app_theme.dart';
 import 'package:flutter_cleanapp/data/supabase_service.dart';
@@ -32,6 +33,7 @@ class _LimpyAppState extends State<LimpyApp> {
   void initState() {
     super.initState();
     _checkAuth();
+    RealtimeService.instance.subscribe();
     SupabaseConfig.client.auth.onAuthStateChange.listen((data) {
       final event = data.event;
       if (event == AuthChangeEvent.signedIn ||
@@ -46,6 +48,12 @@ class _LimpyAppState extends State<LimpyApp> {
         });
       }
     });
+  }
+
+  @override
+  void dispose() {
+    RealtimeService.instance.dispose();
+    super.dispose();
   }
 
   Future<void> _checkAuth() async {
@@ -158,12 +166,14 @@ class _LimpyAppState extends State<LimpyApp> {
                 case 'theme':
                   _toggleTheme();
                 case 'profile':
-                  Navigator.push(
+                  Navigator.push<bool>(
                     context,
                     MaterialPageRoute(
                       builder: (_) => ProfileScreen(currentUser: _currentUser!),
                     ),
-                  );
+                  ).then((changed) {
+                    if (changed == true) _loadCurrentUser();
+                  });
                 case 'logout':
                   _logout();
               }
