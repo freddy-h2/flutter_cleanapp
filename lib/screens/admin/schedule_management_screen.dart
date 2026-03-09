@@ -388,6 +388,7 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
       appBar: AppBar(
         title: const Text('Gestionar Calendario'),
         leading: BackButton(onPressed: () => Navigator.pop(context)),
+        elevation: 0,
         actions: [
           if (_schedules.isNotEmpty)
             IconButton(
@@ -681,6 +682,7 @@ class _CycleGeneratorPageState extends State<_CycleGeneratorPage> {
       appBar: AppBar(
         title: const Text('Generar por Ciclos'),
         leading: BackButton(onPressed: () => Navigator.pop(context)),
+        elevation: 0,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),

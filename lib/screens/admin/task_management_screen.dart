@@ -212,6 +212,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
       appBar: AppBar(
         title: const Text('Gestionar Actividades'),
         leading: BackButton(onPressed: () => Navigator.pop(context)),
+        elevation: 0,
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddDialog,

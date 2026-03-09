@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_cleanapp/data/supabase_service.dart';
 import 'package:flutter_cleanapp/models/cleaning_schedule.dart';
@@ -145,72 +146,78 @@ class _ExtensionRequestsScreenState extends State<ExtensionRequestsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Gestionar Prórrogas'),
-        leading: BackButton(onPressed: () => Navigator.pop(context)),
+    return CupertinoPageScaffold(
+      navigationBar: CupertinoNavigationBar(
+        middle: const Text('Gestionar Prórrogas'),
+        backgroundColor: CupertinoColors.systemBackground.withValues(
+          alpha: 0.8,
+        ),
+        border: null,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _requests.isEmpty
-          ? const Center(child: Text('No hay solicitudes de prórroga.'))
-          : ListView.builder(
-              itemCount: _requests.length,
-              itemBuilder: (context, index) {
-                final request = _requests[index];
-                final requesterName = _userName(request.requesterId);
-                final nextUserName = _userName(request.nextUserId);
-                final statusColor = _statusColor(request.status);
+      child: SafeArea(
+        top: false,
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _requests.isEmpty
+            ? const Center(child: Text('No hay solicitudes de prórroga.'))
+            : ListView.builder(
+                itemCount: _requests.length,
+                itemBuilder: (context, index) {
+                  final request = _requests[index];
+                  final requesterName = _userName(request.requesterId);
+                  final nextUserName = _userName(request.nextUserId);
+                  final statusColor = _statusColor(request.status);
 
-                final leadingIcon = switch (request.status) {
-                  ExtensionRequestStatus.pending => Icons.schedule,
-                  ExtensionRequestStatus.accepted => Icons.check,
-                  ExtensionRequestStatus.rejected => Icons.close,
-                };
+                  final leadingIcon = switch (request.status) {
+                    ExtensionRequestStatus.pending => Icons.schedule,
+                    ExtensionRequestStatus.accepted => Icons.check,
+                    ExtensionRequestStatus.rejected => Icons.close,
+                  };
 
-                Widget? trailing;
-                if (request.isPending) {
-                  trailing = Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.check),
-                        color: Colors.green,
-                        tooltip: 'Aceptar',
-                        onPressed: () => _accept(request),
+                  Widget? trailing;
+                  if (request.isPending) {
+                    trailing = Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.check),
+                          color: Colors.green,
+                          tooltip: 'Aceptar',
+                          onPressed: () => _accept(request),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          color: Colors.red,
+                          tooltip: 'Rechazar',
+                          onPressed: () => _reject(request),
+                        ),
+                      ],
+                    );
+                  }
+
+                  return Card(
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 4,
+                    ),
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: statusColor.withValues(alpha: 0.15),
+                        foregroundColor: statusColor,
+                        child: Icon(leadingIcon),
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.close),
-                        color: Colors.red,
-                        tooltip: 'Rechazar',
-                        onPressed: () => _reject(request),
+                      title: Text('$requesterName → $nextUserName'),
+                      subtitle: Text(
+                        'Periodo: ${_periodDates(request.scheduleId)}'
+                        ' · ${request.status.label}'
+                        '${_userRoom(request.requesterId).isNotEmpty ? '\n${_userRoom(request.requesterId)}' : ''}',
                       ),
-                    ],
+                      trailing: trailing,
+                    ),
                   );
-                }
-
-                return Card(
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 4,
-                  ),
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: statusColor.withValues(alpha: 0.15),
-                      foregroundColor: statusColor,
-                      child: Icon(leadingIcon),
-                    ),
-                    title: Text('$requesterName → $nextUserName'),
-                    subtitle: Text(
-                      'Periodo: ${_periodDates(request.scheduleId)}'
-                      ' · ${request.status.label}'
-                      '${_userRoom(request.requesterId).isNotEmpty ? '\n${_userRoom(request.requesterId)}' : ''}',
-                    ),
-                    trailing: trailing,
-                  ),
-                );
-              },
-            ),
+                },
+              ),
+      ),
     );
   }
 }

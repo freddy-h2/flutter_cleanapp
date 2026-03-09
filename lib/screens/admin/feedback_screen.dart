@@ -534,6 +534,8 @@ class _FeedbackScreenState extends State<FeedbackScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text('Gestionar Comunicados'),
+        elevation: 0,
+        scrolledUnderElevation: 0,
         bottom: TabBar(
           controller: _tabController,
           tabs: const [

@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_cleanapp/data/supabase_service.dart';
 import 'package:flutter_cleanapp/models/announcement.dart';
@@ -80,7 +81,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             Row(
               children: [
                 Icon(
-                  isUpdate ? Icons.system_update : Icons.campaign,
+                  isUpdate
+                      ? CupertinoIcons.arrow_down_circle_fill
+                      : CupertinoIcons.speaker_2_fill,
                   color: isUpdate
                       ? colorScheme.onPrimaryContainer
                       : colorScheme.onSecondaryContainer,
@@ -134,7 +137,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             if (isUpdate && announcement.link != null) ...[
               const SizedBox(height: 12),
               FilledButton.icon(
-                icon: const Icon(Icons.download),
+                icon: const Icon(CupertinoIcons.square_arrow_down),
                 label: const Text('Descargar actualización'),
                 onPressed: () => _openLink(announcement.link!),
               ),
@@ -147,19 +150,28 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Notificaciones')),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _announcements.isEmpty
-          ? const Center(child: Text('No hay notificaciones'))
-          : ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: _announcements.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 8),
-              itemBuilder: (_, index) =>
-                  _buildAnnouncementCard(_announcements[index]),
-            ),
+    return CupertinoPageScaffold(
+      navigationBar: CupertinoNavigationBar(
+        middle: const Text('Notificaciones'),
+        backgroundColor: CupertinoColors.systemBackground.withValues(
+          alpha: 0.8,
+        ),
+        border: null,
+      ),
+      child: SafeArea(
+        top: false,
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _announcements.isEmpty
+            ? const Center(child: Text('No hay notificaciones'))
+            : ListView.separated(
+                padding: const EdgeInsets.all(16),
+                itemCount: _announcements.length,
+                separatorBuilder: (context, index) => const SizedBox(height: 8),
+                itemBuilder: (_, index) =>
+                    _buildAnnouncementCard(_announcements[index]),
+              ),
+      ),
     );
   }
 }
