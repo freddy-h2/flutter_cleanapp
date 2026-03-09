@@ -140,6 +140,13 @@ class SupabaseService {
     await SupabaseConfig.client.from('schedules').insert(schedule.toJson());
   }
 
+  /// Inserts multiple cleaning schedules in a single batch operation.
+  Future<void> createSchedulesBatch(List<CleaningSchedule> schedules) async {
+    await SupabaseConfig.client
+        .from('schedules')
+        .insert(schedules.map((s) => s.toJson()).toList());
+  }
+
   /// Updates fields of the schedule identified by [id].
   ///
   /// Only non-null parameters are included in the update payload.
