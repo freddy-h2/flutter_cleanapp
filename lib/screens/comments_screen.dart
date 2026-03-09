@@ -453,6 +453,24 @@ class _CommentsScreenState extends State<CommentsScreen> {
                 ],
               ),
             ),
+          // Quick reply suggestions
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                _buildSuggestionChip('Ok, enterado 👍', replyController),
+                _buildSuggestionChip('Entendido ✅', replyController),
+                _buildSuggestionChip('Trabajo en eso 🔧', replyController),
+                _buildSuggestionChip(
+                  '¡Gracias por avisar! 😊',
+                  replyController,
+                ),
+                _buildSuggestionChip('Lo reviso pronto 🔍', replyController),
+              ],
+            ),
+          ),
           // Reply input row.
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
@@ -479,6 +497,17 @@ class _CommentsScreenState extends State<CommentsScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  /// Builds a suggestion [ActionChip] that fills [controller] with [text].
+  Widget _buildSuggestionChip(String text, TextEditingController controller) {
+    return ActionChip(
+      label: Text(text, style: const TextStyle(fontSize: 12)),
+      visualDensity: VisualDensity.compact,
+      onPressed: () {
+        controller.text = text;
+      },
     );
   }
 
