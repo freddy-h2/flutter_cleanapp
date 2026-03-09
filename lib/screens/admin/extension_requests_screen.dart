@@ -158,7 +158,25 @@ class _ExtensionRequestsScreenState extends State<ExtensionRequestsScreen> {
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : _requests.isEmpty
-            ? const Center(child: Text('No hay solicitudes de prórroga.'))
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      CupertinoIcons.checkmark_circle,
+                      size: 64,
+                      color: Theme.of(context).colorScheme.outline,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No hay solicitudes de prórroga',
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              )
             : ListView.builder(
                 itemCount: _requests.length,
                 itemBuilder: (context, index) {

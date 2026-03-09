@@ -149,7 +149,25 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : _announcements.isEmpty
-            ? const Center(child: Text('No hay notificaciones'))
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      CupertinoIcons.bell_slash,
+                      size: 64,
+                      color: Theme.of(context).colorScheme.outline,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No hay notificaciones',
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              )
             : ListView.separated(
                 padding: const EdgeInsets.all(16),
                 itemCount: _announcements.length,
