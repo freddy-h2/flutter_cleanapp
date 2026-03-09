@@ -358,49 +358,63 @@ class _LimpyAppState extends State<LimpyApp> {
             );
           },
         ),
-        backgroundColor: CupertinoColors.systemBackground.withValues(
-          alpha: 0.8,
-        ),
+        backgroundColor: Theme.of(
+          context,
+        ).colorScheme.surface.withValues(alpha: 0.85),
         border: null,
       ),
       body: IndexedStack(index: _currentIndex, children: _screens),
-      bottomNavigationBar: ClipRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 15.0, sigmaY: 15.0),
-          child: CupertinoTabBar(
-            currentIndex: _currentIndex,
-            onTap: (index) => setState(() => _currentIndex = index),
-            activeColor: CupertinoColors.activeBlue,
-            backgroundColor: CupertinoColors.systemBackground.withValues(
-              alpha: 0.6,
+      bottomNavigationBar: Container(
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: [
+            BoxShadow(
+              color: Theme.of(context).shadowColor.withValues(alpha: 0.1),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
-            items: const [
-              BottomNavigationBarItem(
-                icon: Icon(CupertinoIcons.calendar),
-                activeIcon: Icon(CupertinoIcons.calendar_today),
-                label: '',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(CupertinoIcons.checkmark_square),
-                activeIcon: Icon(CupertinoIcons.checkmark_square_fill),
-                label: '',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(CupertinoIcons.house),
-                activeIcon: Icon(CupertinoIcons.house_fill),
-                label: '',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(CupertinoIcons.chat_bubble_2),
-                activeIcon: Icon(CupertinoIcons.chat_bubble_2_fill),
-                label: '',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(CupertinoIcons.gear),
-                activeIcon: Icon(CupertinoIcons.gear_solid),
-                label: '',
-              ),
-            ],
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 20.0, sigmaY: 20.0),
+            child: CupertinoTabBar(
+              currentIndex: _currentIndex,
+              onTap: (index) => setState(() => _currentIndex = index),
+              activeColor: CupertinoColors.activeBlue,
+              backgroundColor: Theme.of(
+                context,
+              ).colorScheme.surface.withValues(alpha: 0.7),
+              items: const [
+                BottomNavigationBarItem(
+                  icon: Icon(CupertinoIcons.calendar),
+                  activeIcon: Icon(CupertinoIcons.calendar_today),
+                  label: '',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(CupertinoIcons.checkmark_square),
+                  activeIcon: Icon(CupertinoIcons.checkmark_square_fill),
+                  label: '',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(CupertinoIcons.house),
+                  activeIcon: Icon(CupertinoIcons.house_fill),
+                  label: '',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(CupertinoIcons.chat_bubble_2),
+                  activeIcon: Icon(CupertinoIcons.chat_bubble_2_fill),
+                  label: '',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(CupertinoIcons.gear),
+                  activeIcon: Icon(CupertinoIcons.gear_solid),
+                  label: '',
+                ),
+              ],
+            ),
           ),
         ),
       ),
