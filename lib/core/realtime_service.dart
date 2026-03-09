@@ -33,6 +33,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// ALTER PUBLICATION supabase_realtime ADD TABLE tasks;
 /// ALTER PUBLICATION supabase_realtime ADD TABLE comments;
 /// ALTER PUBLICATION supabase_realtime ADD TABLE extension_requests;
+/// ALTER PUBLICATION supabase_realtime ADD TABLE announcements;
 /// ```
 class RealtimeService {
   RealtimeService._();
@@ -46,6 +47,7 @@ class RealtimeService {
   final _tasksController = StreamController<void>.broadcast();
   final _commentsController = StreamController<void>.broadcast();
   final _extensionsController = StreamController<void>.broadcast();
+  final _announcementsController = StreamController<void>.broadcast();
 
   /// Fires whenever a row in the `schedules` table is inserted, updated,
   /// or deleted.
@@ -62,6 +64,10 @@ class RealtimeService {
   /// Fires whenever a row in the `extension_requests` table is inserted,
   /// updated, or deleted.
   Stream<void> get onExtensionsChanged => _extensionsController.stream;
+
+  /// Fires whenever a row in the `announcements` table is inserted, updated,
+  /// or deleted.
+  Stream<void> get onAnnouncementsChanged => _announcementsController.stream;
 
   /// Opens a single Supabase Realtime channel that listens to all four
   /// tables. Safe to call multiple times — the previous channel is
@@ -106,6 +112,15 @@ class RealtimeService {
             _extensionsController.add(null);
           },
         )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'announcements',
+          callback: (payload) {
+            debugPrint('RealtimeService: announcements changed');
+            _announcementsController.add(null);
+          },
+        )
         .subscribe();
   }
 
@@ -123,5 +138,6 @@ class RealtimeService {
     _tasksController.close();
     _commentsController.close();
     _extensionsController.close();
+    _announcementsController.close();
   }
 }

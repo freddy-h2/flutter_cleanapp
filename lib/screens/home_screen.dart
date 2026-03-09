@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_cleanapp/core/notification_service.dart';
 import 'package:flutter_cleanapp/core/realtime_service.dart';
 import 'package:flutter_cleanapp/data/supabase_service.dart';
+import 'package:flutter_cleanapp/models/announcement.dart';
 import 'package:flutter_cleanapp/models/cleaning_schedule.dart';
 import 'package:flutter_cleanapp/models/extension_request.dart';
 import 'package:flutter_cleanapp/models/user_model.dart';
 import 'package:flutter_cleanapp/screens/admin/extension_requests_screen.dart';
 import 'package:flutter_cleanapp/screens/admin/user_management_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Home screen that shows the current user's cleaning status for the week.
 class HomeScreen extends StatefulWidget {
@@ -67,9 +69,19 @@ class _HomeScreenState extends State<HomeScreen> {
   /// Tracks the last known top-level comment count to detect new comments.
   int _lastKnownCommentCount = 0;
 
+  /// Active announcements to display as banners.
+  List<Announcement> _announcements = [];
+
+  /// IDs of announcements dismissed by the user this session.
+  final Set<String> _dismissedAnnouncementIds = {};
+
+  /// IDs of announcements we have already sent a notification for.
+  Set<String> _knownAnnouncementIds = {};
+
   late final StreamSubscription<void> _schedulesRealtimeSub;
   late final StreamSubscription<void> _extensionsRealtimeSub;
   late final StreamSubscription<void> _commentsRealtimeSub;
+  late final StreamSubscription<void> _announcementsRealtimeSub;
 
   @override
   void initState() {
@@ -95,6 +107,12 @@ class _HomeScreenState extends State<HomeScreen> {
         _checkForNewComments();
       }
     });
+    _announcementsRealtimeSub = RealtimeService.instance.onAnnouncementsChanged
+        .listen((_) {
+          if (mounted) {
+            _loadAnnouncements();
+          }
+        });
   }
 
   @override
@@ -102,6 +120,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _schedulesRealtimeSub.cancel();
     _extensionsRealtimeSub.cancel();
     _commentsRealtimeSub.cancel();
+    _announcementsRealtimeSub.cancel();
     super.dispose();
   }
 
@@ -112,6 +131,7 @@ class _HomeScreenState extends State<HomeScreen> {
         SupabaseService.instance.getSchedules(),
         SupabaseService.instance.getUsers(),
       ]);
+      await _loadAnnouncements();
       final schedules = results[0] as List<CleaningSchedule>;
       final users = results[1] as List<UserModel>;
       if (mounted) {
@@ -257,6 +277,107 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (_) {
       // Non-fatal
     }
+  }
+
+  /// Loads active announcements and fires system notifications for new ones.
+  Future<void> _loadAnnouncements() async {
+    try {
+      final announcements = await SupabaseService.instance
+          .getActiveAnnouncements();
+      if (mounted) {
+        for (final a in announcements) {
+          if (!_dismissedAnnouncementIds.contains(a.id) &&
+              !_knownAnnouncementIds.contains(a.id)) {
+            NotificationService.instance.notifyAnnouncement(
+              title: a.title,
+              body: a.message,
+            );
+          }
+        }
+        setState(() {
+          _knownAnnouncementIds = announcements.map((a) => a.id).toSet();
+          _announcements = announcements;
+        });
+      }
+    } catch (_) {
+      // Non-fatal — leave _announcements as empty.
+    }
+  }
+
+  /// Opens [url] in an external browser or app.
+  Future<void> _openLink(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri != null) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  /// Builds a banner card for the given [announcement].
+  Widget _buildAnnouncementBanner(Announcement announcement) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isUpdate = announcement.type == AnnouncementType.update;
+
+    return Card(
+      color: isUpdate
+          ? colorScheme.primaryContainer
+          : colorScheme.secondaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  isUpdate ? Icons.system_update : Icons.campaign,
+                  color: isUpdate
+                      ? colorScheme.onPrimaryContainer
+                      : colorScheme.onSecondaryContainer,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    announcement.title,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: isUpdate
+                          ? colorScheme.onPrimaryContainer
+                          : colorScheme.onSecondaryContainer,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 18),
+                  onPressed: () {
+                    setState(() {
+                      _dismissedAnnouncementIds.add(announcement.id);
+                    });
+                  },
+                  tooltip: 'Cerrar',
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              announcement.message,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: isUpdate
+                    ? colorScheme.onPrimaryContainer
+                    : colorScheme.onSecondaryContainer,
+              ),
+            ),
+            if (isUpdate && announcement.link != null) ...[
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                icon: const Icon(Icons.download),
+                label: const Text('Descargar actualización'),
+                onPressed: () => _openLink(announcement.link!),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   /// Checks whether a pending extension request already exists for [schedule].
@@ -808,6 +929,11 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
+            for (final a in _announcements)
+              if (!_dismissedAnnouncementIds.contains(a.id)) ...[
+                _buildAnnouncementBanner(a),
+                const SizedBox(height: 8),
+              ],
             if (_incomingRequest != null) ...[
               _buildExtensionBanner(),
               const SizedBox(height: 16),
@@ -901,6 +1027,11 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          for (final a in _announcements)
+            if (!_dismissedAnnouncementIds.contains(a.id)) ...[
+              _buildAnnouncementBanner(a),
+              const SizedBox(height: 8),
+            ],
           if (_incomingRequest != null) ...[
             _buildExtensionBanner(),
             const SizedBox(height: 16),
