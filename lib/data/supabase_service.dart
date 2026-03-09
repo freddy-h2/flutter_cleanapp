@@ -1,8 +1,10 @@
 import 'package:flutter_cleanapp/core/supabase_config.dart';
+import 'package:flutter_cleanapp/models/announcement.dart';
 import 'package:flutter_cleanapp/models/cleaning_schedule.dart';
 import 'package:flutter_cleanapp/models/cleaning_task.dart';
 import 'package:flutter_cleanapp/models/comment.dart';
 import 'package:flutter_cleanapp/models/extension_request.dart';
+import 'package:flutter_cleanapp/models/feedback_model.dart';
 import 'package:flutter_cleanapp/models/user_model.dart';
 
 /// Singleton service that wraps all Supabase database operations.
@@ -560,5 +562,72 @@ class SupabaseService {
         .eq('status', 'accepted')
         .order('created_at', ascending: false);
     return data.map((json) => ExtensionRequest.fromJson(json)).toList();
+  }
+
+  // --- Feedback ---
+
+  /// Sends anonymous app feedback.
+  Future<void> sendFeedback(String message) async {
+    await SupabaseConfig.client.from('feedback').insert({'message': message});
+  }
+
+  /// Returns all feedback entries (admin only), newest first.
+  Future<List<FeedbackModel>> getAllFeedback() async {
+    final data = await SupabaseConfig.client
+        .from('feedback')
+        .select()
+        .order('created_at', ascending: false);
+    return data.map((json) => FeedbackModel.fromJson(json)).toList();
+  }
+
+  /// Deletes a feedback entry (admin only).
+  Future<void> deleteFeedback(String feedbackId) async {
+    await SupabaseConfig.client.from('feedback').delete().eq('id', feedbackId);
+  }
+
+  // --- Announcements ---
+
+  /// Creates a new announcement (admin only).
+  Future<void> createAnnouncement({
+    required String senderId,
+    required String title,
+    required String message,
+    required AnnouncementType type,
+    String? link,
+  }) async {
+    await SupabaseConfig.client.from('announcements').insert({
+      'sender_id': senderId,
+      'title': title,
+      'message': message,
+      'type': type.name,
+      'link': link,
+    });
+  }
+
+  /// Returns all active announcements, newest first.
+  Future<List<Announcement>> getActiveAnnouncements() async {
+    final data = await SupabaseConfig.client
+        .from('announcements')
+        .select()
+        .eq('is_active', true)
+        .order('created_at', ascending: false);
+    return data.map((json) => Announcement.fromJson(json)).toList();
+  }
+
+  /// Returns all announcements (admin), newest first.
+  Future<List<Announcement>> getAllAnnouncements() async {
+    final data = await SupabaseConfig.client
+        .from('announcements')
+        .select()
+        .order('created_at', ascending: false);
+    return data.map((json) => Announcement.fromJson(json)).toList();
+  }
+
+  /// Deactivates an announcement (admin only).
+  Future<void> deactivateAnnouncement(String announcementId) async {
+    await SupabaseConfig.client
+        .from('announcements')
+        .update({'is_active': false})
+        .eq('id', announcementId);
   }
 }
