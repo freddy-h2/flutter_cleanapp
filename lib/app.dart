@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:app_links/app_links.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_cleanapp/core/realtime_service.dart';
 import 'package:flutter_cleanapp/core/supabase_config.dart';
 import 'package:flutter_cleanapp/core/theme/app_theme.dart';
@@ -447,88 +448,102 @@ class _LimpyAppState extends State<LimpyApp> {
     );
   }
 
-  Widget _buildMainShell() {
-    return Scaffold(
-      appBar: CupertinoNavigationBar(
-        middle: Text(_currentTitle),
-        trailing: CupertinoButton(
-          padding: EdgeInsets.zero,
-          child: const Icon(CupertinoIcons.bell),
-          onPressed: () {
-            _navigatorKey.currentState?.push(
-              CupertinoPageRoute(builder: (_) => const NotificationsScreen()),
-            );
-          },
+  Widget _buildMainShell(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: isDark
+          ? SystemUiOverlayStyle.light.copyWith(
+              statusBarColor: Colors.transparent,
+              systemNavigationBarColor: Colors.black,
+            )
+          : SystemUiOverlayStyle.dark.copyWith(
+              statusBarColor: Colors.transparent,
+              systemNavigationBarColor: Colors.white,
+            ),
+      child: Scaffold(
+        appBar: CupertinoNavigationBar(
+          middle: Text(_currentTitle),
+          trailing: CupertinoButton(
+            padding: EdgeInsets.zero,
+            child: const Icon(CupertinoIcons.bell),
+            onPressed: () {
+              _navigatorKey.currentState?.push(
+                CupertinoPageRoute(builder: (_) => const NotificationsScreen()),
+              );
+            },
+          ),
+          backgroundColor: Theme.of(context).brightness == Brightness.dark
+              ? const Color(0xFF000000)
+              : Theme.of(context).colorScheme.surface.withValues(alpha: 0.85),
+          border: null,
+          transitionBetweenRoutes: false,
         ),
-        backgroundColor: Theme.of(context).brightness == Brightness.dark
-            ? const Color(0xFF000000)
-            : Theme.of(context).colorScheme.surface.withValues(alpha: 0.85),
-        border: null,
-        transitionBetweenRoutes: false,
-      ),
-      body: IndexedStack(index: _currentIndex, children: _screens),
-      bottomNavigationBar: Container(
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(28),
-          boxShadow: Theme.of(context).brightness == Brightness.dark
-              ? null
-              : [
-                  BoxShadow(
-                    color: Theme.of(context).shadowColor.withValues(alpha: 0.1),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
+        body: IndexedStack(index: _currentIndex, children: _screens),
+        bottomNavigationBar: Container(
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: Theme.of(context).brightness == Brightness.dark
+                ? null
+                : [
+                    BoxShadow(
+                      color: Theme.of(
+                        context,
+                      ).shadowColor.withValues(alpha: 0.1),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(28),
+            child: BackdropFilter(
+              filter: Theme.of(context).brightness == Brightness.dark
+                  ? ImageFilter.blur(sigmaX: 0, sigmaY: 0)
+                  : ImageFilter.blur(sigmaX: 20.0, sigmaY: 20.0),
+              child: CupertinoTabBar(
+                currentIndex: _currentIndex,
+                onTap: (index) => setState(() => _currentIndex = index),
+                activeColor: CupertinoColors.activeBlue,
+                backgroundColor: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.black
+                    : Theme.of(
+                        context,
+                      ).colorScheme.surface.withValues(alpha: 0.7),
+                inactiveColor: Theme.of(context).brightness == Brightness.dark
+                    ? CupertinoColors.systemGrey
+                    : CupertinoColors.inactiveGray,
+                border: Theme.of(context).brightness == Brightness.dark
+                    ? const Border()
+                    : null,
+                items: const [
+                  BottomNavigationBarItem(
+                    icon: Icon(CupertinoIcons.calendar),
+                    activeIcon: Icon(CupertinoIcons.calendar_today),
+                    label: 'Calendario',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(CupertinoIcons.checkmark_square),
+                    activeIcon: Icon(CupertinoIcons.checkmark_square_fill),
+                    label: 'Actividades',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(CupertinoIcons.house),
+                    activeIcon: Icon(CupertinoIcons.house_fill),
+                    label: 'Inicio',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(CupertinoIcons.chat_bubble_2),
+                    activeIcon: Icon(CupertinoIcons.chat_bubble_2_fill),
+                    label: 'Comentarios',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(CupertinoIcons.gear),
+                    activeIcon: Icon(CupertinoIcons.gear_solid),
+                    label: 'Configuración',
                   ),
                 ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(28),
-          child: BackdropFilter(
-            filter: Theme.of(context).brightness == Brightness.dark
-                ? ImageFilter.blur(sigmaX: 0, sigmaY: 0)
-                : ImageFilter.blur(sigmaX: 20.0, sigmaY: 20.0),
-            child: CupertinoTabBar(
-              currentIndex: _currentIndex,
-              onTap: (index) => setState(() => _currentIndex = index),
-              activeColor: CupertinoColors.activeBlue,
-              backgroundColor: Theme.of(context).brightness == Brightness.dark
-                  ? Colors.black
-                  : Theme.of(
-                      context,
-                    ).colorScheme.surface.withValues(alpha: 0.7),
-              inactiveColor: Theme.of(context).brightness == Brightness.dark
-                  ? CupertinoColors.systemGrey
-                  : CupertinoColors.inactiveGray,
-              border: Theme.of(context).brightness == Brightness.dark
-                  ? const Border()
-                  : null,
-              items: const [
-                BottomNavigationBarItem(
-                  icon: Icon(CupertinoIcons.calendar),
-                  activeIcon: Icon(CupertinoIcons.calendar_today),
-                  label: 'Calendario',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(CupertinoIcons.checkmark_square),
-                  activeIcon: Icon(CupertinoIcons.checkmark_square_fill),
-                  label: 'Actividades',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(CupertinoIcons.house),
-                  activeIcon: Icon(CupertinoIcons.house_fill),
-                  label: 'Inicio',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(CupertinoIcons.chat_bubble_2),
-                  activeIcon: Icon(CupertinoIcons.chat_bubble_2_fill),
-                  label: 'Comentarios',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(CupertinoIcons.gear),
-                  activeIcon: Icon(CupertinoIcons.gear_solid),
-                  label: 'Configuración',
-                ),
-              ],
+              ),
             ),
           ),
         ),
@@ -548,7 +563,7 @@ class _LimpyAppState extends State<LimpyApp> {
       home: _isLoadingUser
           ? const Scaffold(body: Center(child: CircularProgressIndicator()))
           : _isAuthenticated && _currentUser != null
-          ? _buildMainShell()
+          ? Builder(builder: (innerContext) => _buildMainShell(innerContext))
           : !_isAuthenticated &&
                 SupabaseConfig.client.auth.currentSession != null &&
                 !(SupabaseConfig.client.auth.currentSession!.isExpired)
