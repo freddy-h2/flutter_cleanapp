@@ -169,6 +169,27 @@ class _CalendarScreenState extends State<CalendarScreen> {
     return schedule.userId == widget.currentUser.id;
   }
 
+  /// Returns a label describing the swap partner for an accepted [request].
+  ///
+  /// If [currentUserId] is the requester, they received the next user's dates,
+  /// so we show the next user's name. Otherwise, the current user is the next
+  /// user who received the requester's dates, so we show the requester's name.
+  String _swapLabel(ExtensionRequest request, String currentUserId) {
+    if (currentUserId == request.requesterId) {
+      final nextUser = _users.firstWhere(
+        (u) => u.id == request.nextUserId,
+        orElse: () => const UserModel(id: '', name: '?', room: ''),
+      );
+      return 'con ${nextUser.name}';
+    } else {
+      final requester = _users.firstWhere(
+        (u) => u.id == request.requesterId,
+        orElse: () => const UserModel(id: '', name: '?', room: ''),
+      );
+      return 'con ${requester.name}';
+    }
+  }
+
   /// Builds the list view of schedules.
   Widget _buildListView(
     List<_ListItem> items,
@@ -243,7 +264,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 if (request != null &&
                     request.status == ExtensionRequestStatus.accepted)
                   Chip(
-                    label: const Text('Prórroga aceptada'),
+                    label: Text(
+                      'Intercambiado ${_swapLabel(request, period.user.id)}',
+                    ),
                     avatar: const Icon(Icons.swap_horiz, size: 16),
                     visualDensity: VisualDensity.compact,
                     backgroundColor: colorScheme.secondaryContainer,
