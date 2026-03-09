@@ -24,12 +24,10 @@ void main() {
       expect(find.byType(CircularProgressIndicator), findsWidgets);
     });
 
-    testWidgets('shows TabBar with Enviar and Recibir tabs', (tester) async {
+    testWidgets('shows no TabBar — single role-based view', (tester) async {
       await tester.pumpWidget(createTestWidget());
-      // TabBar is always visible regardless of loading state
-      expect(find.text('Enviar'), findsOneWidget);
-      expect(find.text('Recibir'), findsOneWidget);
-      expect(find.byType(TabBar), findsOneWidget);
+      // The redesigned screen has no TabBar — single view based on role.
+      expect(find.byType(TabBar), findsNothing);
     });
 
     testWidgets('can be constructed with required currentUser', (tester) async {

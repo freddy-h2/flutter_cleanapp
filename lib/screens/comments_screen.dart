@@ -8,7 +8,12 @@ import 'package:flutter_cleanapp/models/cleaning_schedule.dart';
 import 'package:flutter_cleanapp/models/comment.dart';
 import 'package:flutter_cleanapp/models/user_model.dart';
 
-/// Screen with two tabs: Enviar (send anonymous comments) and Recibir (inbox).
+/// Screen that shows a single role-based view for comments.
+///
+/// Non-responsible users see a send form plus their own sent comments with
+/// any replies from the responsible user.
+/// The responsible user sees an inbox with all anonymous comments and can
+/// reply to each one.
 class CommentsScreen extends StatefulWidget {
   /// The currently authenticated user.
   final UserModel currentUser;
@@ -20,17 +25,24 @@ class CommentsScreen extends StatefulWidget {
   State<CommentsScreen> createState() => _CommentsScreenState();
 }
 
-class _CommentsScreenState extends State<CommentsScreen>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabController;
+class _CommentsScreenState extends State<CommentsScreen> {
   final TextEditingController _messageController = TextEditingController();
 
   bool _isLoading = true;
   CleaningSchedule? _currentWeekSchedule;
   UserModel? _responsible;
-  List<Comment> _receivedComments = [];
+  bool _isResponsible = false;
 
-  /// Tracks the last known comment count to detect new incoming comments.
+  /// For sender view: the user's own sent comments with replies.
+  Map<Comment, List<Comment>> _myCommentsWithReplies = {};
+
+  /// For inbox view: all top-level comments with their replies.
+  Map<Comment, List<Comment>> _commentsWithReplies = {};
+
+  /// Reply controllers — one per comment being replied to.
+  final Map<String, TextEditingController> _replyControllers = {};
+
+  /// Tracks the last known top-level comment count to detect new comments.
   int _lastKnownCommentCount = 0;
 
   late final StreamSubscription<void> _commentsRealtimeSub;
@@ -39,7 +51,6 @@ class _CommentsScreenState extends State<CommentsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
     _loadData();
     _commentsRealtimeSub = RealtimeService.instance.onCommentsChanged.listen((
       _,
@@ -61,8 +72,10 @@ class _CommentsScreenState extends State<CommentsScreen>
   void dispose() {
     _commentsRealtimeSub.cancel();
     _schedulesRealtimeSub.cancel();
-    _tabController.dispose();
     _messageController.dispose();
+    for (final controller in _replyControllers.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -71,7 +84,6 @@ class _CommentsScreenState extends State<CommentsScreen>
     try {
       final schedule = await SupabaseService.instance.getCurrentWeekSchedule();
       UserModel? responsible;
-      List<Comment> comments = [];
 
       if (schedule != null) {
         final users = await SupabaseService.instance.getUsers();
@@ -79,24 +91,33 @@ class _CommentsScreenState extends State<CommentsScreen>
           (u) => u.id == schedule.userId,
           orElse: () => const UserModel(id: '', name: '?', room: ''),
         );
+      }
 
-        // Load comments if current user is the responsible one
-        if (schedule.userId == widget.currentUser.id) {
-          comments = await SupabaseService.instance.getCommentsForSchedule(
+      final isResponsible =
+          schedule != null && schedule.userId == widget.currentUser.id;
+
+      Map<Comment, List<Comment>> commentsWithReplies = {};
+      Map<Comment, List<Comment>> myComments = {};
+
+      if (schedule != null) {
+        if (isResponsible) {
+          commentsWithReplies = await SupabaseService.instance
+              .getCommentsWithReplies(schedule.id);
+        } else {
+          myComments = await SupabaseService.instance.getCommentsBySender(
             schedule.id,
+            widget.currentUser.id,
           );
         }
       }
 
       if (mounted) {
-        // Notify the responsible user when new comments arrive (but not on
-        // the very first load, and not for the user's own send actions).
-        final isResponsible =
-            schedule != null && schedule.userId == widget.currentUser.id;
+        // Notify the responsible user when new top-level comments arrive.
+        final topLevelCount = commentsWithReplies.keys.length;
         if (isResponsible &&
             _lastKnownCommentCount > 0 &&
-            comments.length > _lastKnownCommentCount) {
-          final newCount = comments.length - _lastKnownCommentCount;
+            topLevelCount > _lastKnownCommentCount) {
+          final newCount = topLevelCount - _lastKnownCommentCount;
           for (var i = 0; i < newCount; i++) {
             NotificationService.instance.notifyNewComment(
               commentIndex: _lastKnownCommentCount + i,
@@ -107,8 +128,10 @@ class _CommentsScreenState extends State<CommentsScreen>
         setState(() {
           _currentWeekSchedule = schedule;
           _responsible = responsible;
-          _receivedComments = comments;
-          _lastKnownCommentCount = comments.length;
+          _isResponsible = isResponsible;
+          _commentsWithReplies = commentsWithReplies;
+          _myCommentsWithReplies = myComments;
+          _lastKnownCommentCount = topLevelCount;
           _isLoading = false;
         });
       }
@@ -143,6 +166,7 @@ class _CommentsScreenState extends State<CommentsScreen>
       await SupabaseService.instance.sendComment(
         _currentWeekSchedule!.id,
         text,
+        senderId: widget.currentUser.id,
       );
       if (mounted) {
         _messageController.clear();
@@ -162,6 +186,31 @@ class _CommentsScreenState extends State<CommentsScreen>
     }
   }
 
+  /// Sends a reply to [parentComment] from the responsible user.
+  Future<void> _sendReply(Comment parentComment) async {
+    final controller = _replyControllers[parentComment.id];
+    if (controller == null || controller.text.trim().isEmpty) return;
+
+    try {
+      await SupabaseService.instance.sendComment(
+        _currentWeekSchedule!.id,
+        controller.text.trim(),
+        senderId: widget.currentUser.id,
+        parentId: parentComment.id,
+      );
+      if (mounted) {
+        controller.clear();
+        // Data will reload via Realtime subscription.
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al enviar respuesta: $e')),
+        );
+      }
+    }
+  }
+
   /// Returns a relative-time string in Spanish for [dateTime].
   String _formatTime(DateTime dateTime) {
     final diff = DateTime.now().difference(dateTime);
@@ -176,14 +225,10 @@ class _CommentsScreenState extends State<CommentsScreen>
     }
   }
 
-  /// Builds the Enviar (send) tab content.
-  Widget _buildSendTab() {
+  /// Builds the sender view for non-responsible users.
+  Widget _buildSenderView() {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -193,7 +238,7 @@ class _CommentsScreenState extends State<CommentsScreen>
           Icon(Icons.message_outlined, size: 48, color: colorScheme.primary),
           const SizedBox(height: 12),
           Text(
-            'Enviar Comentario Anónimo',
+            'Comentarios Anónimos',
             style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             textAlign: TextAlign.center,
           ),
@@ -243,126 +288,224 @@ class _CommentsScreenState extends State<CommentsScreen>
               label: const Text('Enviar Comentario'),
             ),
           ),
+          if (_myCommentsWithReplies.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            const Divider(),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Mis comentarios',
+                style: textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            for (final entry in _myCommentsWithReplies.entries)
+              _buildSentCommentTile(entry.key, entry.value),
+          ],
         ],
       ),
     );
   }
 
-  /// Builds the Recibir (receive) tab content.
-  Widget _buildReceiveTab() {
+  /// Builds an [ExpansionTile] for a sent comment with its replies.
+  Widget _buildSentCommentTile(Comment comment, List<Comment> replies) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    final isResponsible =
-        _currentWeekSchedule != null &&
-        _currentWeekSchedule!.userId == widget.currentUser.id;
-
-    if (isResponsible) {
-      return Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Icon(Icons.inbox, size: 48, color: colorScheme.primary),
-            const SizedBox(height: 12),
-            Text(
-              'Buzón de Comentarios',
-              style: textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Comentarios anónimos de tus vecinos',
-              style: textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            if (_receivedComments.isEmpty)
-              const Center(child: Text('No tienes comentarios aún'))
-            else
-              Expanded(
-                child: ListView(
-                  children: [
-                    for (final comment in _receivedComments)
-                      Card(
-                        child: ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: colorScheme.secondaryContainer,
-                            child: Icon(
-                              Icons.person_off,
-                              color: colorScheme.onSecondaryContainer,
-                            ),
-                          ),
-                          title: Text(comment.message),
-                          subtitle: Text(_formatTime(comment.createdAt)),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-          ],
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      child: ExpansionTile(
+        title: Text(
+          comment.message,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
         ),
-      );
-    }
-
-    // Not the responsible user — show locked empty state.
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.lock_outline, size: 64, color: colorScheme.outline),
-            const SizedBox(height: 16),
-            Text(
-              'Buzón no disponible',
-              style: textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: 280,
+        subtitle: Text(_formatTime(comment.createdAt)),
+        children: [
+          if (replies.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Text(
-                'Solo puedes ver comentarios cuando eres el responsable del aseo',
+                'Sin respuesta aún',
                 style: textTheme.bodyMedium?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                 ),
-                textAlign: TextAlign.center,
+              ),
+            )
+          else
+            for (final reply in replies)
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: colorScheme.secondaryContainer,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _responsible?.name ?? 'Responsable',
+                      style: textTheme.labelMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.onSecondaryContainer,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      reply.message,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSecondaryContainer,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _formatTime(reply.createdAt),
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSecondaryContainer,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  /// Builds the inbox view for the responsible user.
+  Widget _buildInboxView() {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(Icons.inbox, size: 48, color: colorScheme.primary),
+          const SizedBox(height: 12),
+          Text(
+            'Buzón de Comentarios',
+            style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Comentarios anónimos de tus vecinos',
+            style: textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          if (_commentsWithReplies.isEmpty)
+            const Center(child: Text('No tienes comentarios aún'))
+          else
+            for (final entry in _commentsWithReplies.entries)
+              _buildInboxCommentTile(entry.key, entry.value),
+        ],
+      ),
+    );
+  }
+
+  /// Builds an expandable [Card] for an inbox comment with reply capability.
+  Widget _buildInboxCommentTile(Comment comment, List<Comment> replies) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    // Ensure a reply controller exists for this comment.
+    _replyControllers.putIfAbsent(comment.id, () => TextEditingController());
+    final replyController = _replyControllers[comment.id]!;
+
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      child: ExpansionTile(
+        leading: CircleAvatar(
+          backgroundColor: colorScheme.secondaryContainer,
+          child: Icon(
+            Icons.person_off,
+            color: colorScheme.onSecondaryContainer,
+          ),
+        ),
+        title: Text(comment.message),
+        subtitle: Text(_formatTime(comment.createdAt)),
+        children: [
+          // Existing replies.
+          for (final reply in replies)
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Tú',
+                    style: textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onPrimaryContainer,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    reply.message,
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onPrimaryContainer,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _formatTime(reply.createdAt),
+                    style: textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onPrimaryContainer,
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+          // Reply input row.
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: replyController,
+                    decoration: const InputDecoration(
+                      hintText: 'Escribe una respuesta...',
+                      isDense: true,
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.send),
+                  tooltip: 'Enviar respuesta',
+                  onPressed: () => _sendReply(comment),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(icon: Icon(Icons.send_outlined), text: 'Enviar'),
-            Tab(icon: Icon(Icons.inbox_outlined), text: 'Recibir'),
-          ],
-        ),
-        Expanded(
-          child: TabBarView(
-            controller: _tabController,
-            children: [_buildSendTab(), _buildReceiveTab()],
-          ),
-        ),
-      ],
-    );
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return _isResponsible ? _buildInboxView() : _buildSenderView();
   }
 }
