@@ -168,24 +168,34 @@ class _CalendarScreenState extends State<CalendarScreen> {
       final schedules = List<CleaningSchedule>.from(_schedules)
         ..sort((a, b) => a.date.compareTo(b.date));
 
-      // Build a flat list of items: month headers + schedule entries.
-      final items = <_ListItem>[];
-      int? lastMonth;
+      // Group consecutive same-user schedules into period entries.
+      final periods = <_PeriodEntry>[];
       for (final schedule in schedules) {
-        if (lastMonth != schedule.date.month) {
-          items.add(
-            _MonthHeader(
-              label:
-                  '${_monthNames[schedule.date.month - 1]} ${schedule.date.year}',
-            ),
-          );
-          lastMonth = schedule.date.month;
-        }
         final user = _users.firstWhere(
           (u) => u.id == schedule.userId,
           orElse: () => const UserModel(id: '', name: '?', room: ''),
         );
-        items.add(_ScheduleEntry(schedule: schedule, user: user));
+        if (periods.isNotEmpty && periods.last.user.id == schedule.userId) {
+          periods.last.schedules.add(schedule);
+        } else {
+          periods.add(_PeriodEntry(schedules: [schedule], user: user));
+        }
+      }
+
+      // Build a flat list of items: month headers + period entries.
+      final items = <_ListItem>[];
+      int? lastMonth;
+      for (final period in periods) {
+        final firstDate = period.schedules.first.date;
+        if (lastMonth != firstDate.month) {
+          items.add(
+            _MonthHeader(
+              label: '${_monthNames[firstDate.month - 1]} ${firstDate.year}',
+            ),
+          );
+          lastMonth = firstDate.month;
+        }
+        items.add(period);
       }
 
       body = Column(
@@ -228,19 +238,34 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     ),
                   );
                 }
-                final entry = item as _ScheduleEntry;
-                final schedule = entry.schedule;
-                final user = entry.user;
-                final currentWeek = _isCurrentPeriod(schedule);
-                final currentUser = _isCurrentUser(schedule);
-                final request = _getRequestForSchedule(schedule);
+                final period = item as _PeriodEntry;
+                final user = period.user;
+                final firstDate = period.schedules.first.date;
+                final lastDate = period.schedules.last.date;
+                final isCurrentPeriod = period.schedules.any(_isCurrentPeriod);
+                final isCurrentUser = period.schedules.any(_isCurrentUser);
+                final allCompleted = period.schedules.every(
+                  (s) => s.isCompleted,
+                );
+                // Find the first matching extension request across all
+                // schedules in the group.
+                final request = period.schedules
+                    .map(_getRequestForSchedule)
+                    .nonNulls
+                    .firstOrNull;
+
+                final subtitleText = period.schedules.length > 1
+                    ? '${user.room} — Periodo del '
+                          '${_formatDate(firstDate)} al '
+                          '${_formatDate(lastDate)}'
+                    : '${user.room} — Periodo del ${_formatDate(firstDate)}';
 
                 return Card(
                   margin: const EdgeInsets.symmetric(
                     horizontal: 16,
                     vertical: 4,
                   ),
-                  shape: currentUser
+                  shape: isCurrentUser
                       ? RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                           side: BorderSide(
@@ -251,10 +276,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       : null,
                   child: ListTile(
                     leading: CircleAvatar(
-                      backgroundColor: currentWeek
+                      backgroundColor: isCurrentPeriod
                           ? colorScheme.primary
                           : colorScheme.surfaceContainerHighest,
-                      foregroundColor: currentWeek
+                      foregroundColor: isCurrentPeriod
                           ? colorScheme.onPrimary
                           : colorScheme.onSurfaceVariant,
                       child: Text(user.name[0]),
@@ -263,9 +288,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          '${user.room} — Periodo del ${_formatDate(schedule.date)}',
-                        ),
+                        Text(subtitleText),
                         if (request != null && request.isPending)
                           Chip(
                             label: const Text('Prórroga pendiente'),
@@ -283,9 +306,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
                           ),
                       ],
                     ),
-                    trailing: schedule.isCompleted
+                    trailing: allCompleted
                         ? Icon(Icons.check_circle, color: colorScheme.primary)
-                        : currentWeek
+                        : isCurrentPeriod
                         ? Chip(
                             label: const Text('Este periodo'),
                             backgroundColor: colorScheme.primaryContainer,
@@ -330,9 +353,9 @@ final class _MonthHeader extends _ListItem {
   final String label;
 }
 
-/// A schedule entry item.
-final class _ScheduleEntry extends _ListItem {
-  _ScheduleEntry({required this.schedule, required this.user});
-  final CleaningSchedule schedule;
+/// A grouped period entry — one or more consecutive same-user schedules.
+final class _PeriodEntry extends _ListItem {
+  _PeriodEntry({required this.schedules, required this.user});
+  final List<CleaningSchedule> schedules;
   final UserModel user;
 }
