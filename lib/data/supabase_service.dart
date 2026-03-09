@@ -46,6 +46,20 @@ class SupabaseService {
 
   // --- Profiles ---
 
+  /// Updates the current user's profile name and/or room.
+  Future<void> updateProfile({String? name, String? room}) async {
+    final userId = SupabaseConfig.client.auth.currentUser?.id;
+    if (userId == null) return;
+    final updates = <String, dynamic>{};
+    if (name != null) updates['name'] = name;
+    if (room != null) updates['room'] = room;
+    if (updates.isEmpty) return;
+    await SupabaseConfig.client
+        .from('profiles')
+        .update(updates)
+        .eq('id', userId);
+  }
+
   /// Returns all user profiles ordered by name.
   Future<List<UserModel>> getUsers() async {
     final data = await SupabaseConfig.client
@@ -148,11 +162,17 @@ class SupabaseService {
   }
 
   /// Creates a new task with the given [title] and [sortOrder].
-  Future<void> createTask(String title, int sortOrder) async {
-    await SupabaseConfig.client.from('tasks').insert({
-      'title': title,
-      'sort_order': sortOrder,
-    });
+  ///
+  /// Optionally accepts a [description] that maps to the DB column
+  /// description_task.
+  Future<void> createTask(
+    String title,
+    int sortOrder, {
+    String? description,
+  }) async {
+    final data = <String, dynamic>{'title': title, 'sort_order': sortOrder};
+    if (description != null) data['description_task'] = description;
+    await SupabaseConfig.client.from('tasks').insert(data);
   }
 
   /// Updates fields of the task identified by [id].
@@ -163,11 +183,13 @@ class SupabaseService {
     String? title,
     int? sortOrder,
     bool? isActive,
+    String? description,
   }) async {
     final updates = <String, dynamic>{};
     if (title != null) updates['title'] = title;
     if (sortOrder != null) updates['sort_order'] = sortOrder;
     if (isActive != null) updates['is_active'] = isActive;
+    if (description != null) updates['description_task'] = description;
     await SupabaseConfig.client.from('tasks').update(updates).eq('id', id);
   }
 

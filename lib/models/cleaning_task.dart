@@ -5,6 +5,9 @@ class CleaningTask {
   final int sortOrder;
   final bool isActive;
 
+  /// Optional description for this task. Maps to the DB column description_task.
+  final String description;
+
   /// Local-only UI state — not persisted to the database.
   final bool isCompleted;
 
@@ -21,6 +24,7 @@ class CleaningTask {
     required this.title,
     this.sortOrder = 0,
     this.isActive = true,
+    this.description = '',
     this.isCompleted = false,
     this.scheduleId = '',
     this.updatedAt,
@@ -31,6 +35,7 @@ class CleaningTask {
     title: json["title"] as String,
     sortOrder: json["sort_order"] as int? ?? 0,
     isActive: json["is_active"] as bool? ?? true,
+    description: json['description_task'] as String? ?? '',
     updatedAt: json["updated_at"] == null
         ? null
         : DateTime.parse(json["updated_at"] as String),
@@ -40,6 +45,7 @@ class CleaningTask {
     "title": title,
     "sort_order": sortOrder,
     "is_active": isActive,
+    "description_task": description,
   };
 
   /// Returns a copy of this task with the given fields optionally overridden.
@@ -48,12 +54,14 @@ class CleaningTask {
     String? title,
     int? sortOrder,
     bool? isActive,
+    String? description,
   }) => CleaningTask(
     id: id,
     scheduleId: scheduleId,
     title: title ?? this.title,
     sortOrder: sortOrder ?? this.sortOrder,
     isActive: isActive ?? this.isActive,
+    description: description ?? this.description,
     isCompleted: isCompleted ?? this.isCompleted,
     updatedAt: updatedAt,
   );

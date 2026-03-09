@@ -44,6 +44,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
   Future<void> _showAddDialog() async {
     final formKey = GlobalKey<FormState>();
     final titleController = TextEditingController();
+    final descriptionController = TextEditingController();
 
     await showDialog<void>(
       context: context,
@@ -51,15 +52,26 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
         title: const Text('Agregar actividad'),
         content: Form(
           key: formKey,
-          child: TextFormField(
-            controller: titleController,
-            decoration: const InputDecoration(
-              labelText: 'Nombre de la actividad',
-            ),
-            validator: (value) => (value == null || value.trim().isEmpty)
-                ? 'El nombre no puede estar vacío'
-                : null,
-            autofocus: true,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: titleController,
+                decoration: const InputDecoration(
+                  labelText: 'Nombre de la actividad',
+                ),
+                validator: (value) => (value == null || value.trim().isEmpty)
+                    ? 'El nombre no puede estar vacío'
+                    : null,
+                autofocus: true,
+              ),
+              TextFormField(
+                controller: descriptionController,
+                decoration: const InputDecoration(
+                  labelText: 'Descripcion de la actividad',
+                ),
+              ),
+            ],
           ),
         ),
         actions: [
@@ -71,10 +83,15 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
             onPressed: () {
               if (!formKey.currentState!.validate()) return;
               final title = titleController.text.trim();
+              final description = descriptionController.text.trim();
               final messenger = ScaffoldMessenger.of(this.context);
               Navigator.pop(context);
               SupabaseService.instance
-                  .createTask(title, _tasks.length + 1)
+                  .createTask(
+                    title,
+                    _tasks.length + 1,
+                    description: description.isEmpty ? null : description,
+                  )
                   .then((_) => _loadTasks())
                   .catchError((Object e) {
                     messenger.showSnackBar(
@@ -92,6 +109,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
   Future<void> _showEditDialog(CleaningTask task) async {
     final formKey = GlobalKey<FormState>();
     final titleController = TextEditingController(text: task.title);
+    final descriptionController = TextEditingController(text: task.description);
 
     await showDialog<void>(
       context: context,
@@ -99,15 +117,26 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
         title: const Text('Editar actividad'),
         content: Form(
           key: formKey,
-          child: TextFormField(
-            controller: titleController,
-            decoration: const InputDecoration(
-              labelText: 'Nombre de la actividad',
-            ),
-            validator: (value) => (value == null || value.trim().isEmpty)
-                ? 'El nombre no puede estar vacío'
-                : null,
-            autofocus: true,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: titleController,
+                decoration: const InputDecoration(
+                  labelText: 'Nombre de la actividad',
+                ),
+                validator: (value) => (value == null || value.trim().isEmpty)
+                    ? 'El nombre no puede estar vacío'
+                    : null,
+                autofocus: true,
+              ),
+              TextFormField(
+                controller: descriptionController,
+                decoration: const InputDecoration(
+                  labelText: 'Descripcion de la actividad',
+                ),
+              ),
+            ],
           ),
         ),
         actions: [
@@ -119,10 +148,15 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
             onPressed: () {
               if (!formKey.currentState!.validate()) return;
               final newTitle = titleController.text.trim();
+              final newDescription = descriptionController.text.trim();
               final messenger = ScaffoldMessenger.of(this.context);
               Navigator.pop(context);
               SupabaseService.instance
-                  .updateTask(task.id, title: newTitle)
+                  .updateTask(
+                    task.id,
+                    title: newTitle,
+                    description: newDescription,
+                  )
                   .then((_) => _loadTasks())
                   .catchError((Object e) {
                     messenger.showSnackBar(
@@ -204,7 +238,8 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                       title: Text(task.title),
                       subtitle: Text(
                         'Orden: ${task.sortOrder}'
-                        '${task.isActive ? '' : ' — Inactiva'}',
+                        '${task.isActive ? '' : ' — Inactiva'}'
+                        '${task.description.isNotEmpty ? '\n${task.description}' : ''}',
                       ),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,

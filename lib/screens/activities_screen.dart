@@ -219,6 +219,9 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
                         : null,
                   ),
                 ),
+                subtitle: task.description.isNotEmpty
+                    ? Text(task.description)
+                    : null,
                 trailing: Icon(
                   task.isCompleted ? Icons.check_circle : Icons.circle_outlined,
                   color: task.isCompleted
