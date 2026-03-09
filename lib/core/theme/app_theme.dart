@@ -157,7 +157,10 @@ abstract final class AppTheme {
     ),
     appBarTheme: const AppBarTheme(
       centerTitle: true,
-      scrolledUnderElevation: 2,
+      scrolledUnderElevation: 0,
+      backgroundColor: Colors.black,
+      foregroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
     ),
     navigationBarTheme: NavigationBarThemeData(
       height: 70,

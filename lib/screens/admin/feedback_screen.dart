@@ -550,6 +550,12 @@ class _FeedbackScreenState extends State<FeedbackScreen>
         title: const Text('Gestionar Comunicados'),
         elevation: 0,
         scrolledUnderElevation: 0,
+        backgroundColor: Theme.of(context).brightness == Brightness.dark
+            ? Colors.black
+            : null,
+        foregroundColor: Theme.of(context).brightness == Brightness.dark
+            ? Colors.white
+            : null,
         bottom: TabBar(
           controller: _tabController,
           tabs: const [

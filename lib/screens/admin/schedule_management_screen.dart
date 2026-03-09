@@ -389,6 +389,12 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
         title: const Text('Gestionar Calendario'),
         leading: BackButton(onPressed: () => Navigator.pop(context)),
         elevation: 0,
+        backgroundColor: Theme.of(context).brightness == Brightness.dark
+            ? Colors.black
+            : null,
+        foregroundColor: Theme.of(context).brightness == Brightness.dark
+            ? Colors.white
+            : null,
         actions: [
           if (_schedules.isNotEmpty)
             IconButton(
@@ -683,6 +689,12 @@ class _CycleGeneratorPageState extends State<_CycleGeneratorPage> {
         title: const Text('Generar por Ciclos'),
         leading: BackButton(onPressed: () => Navigator.pop(context)),
         elevation: 0,
+        backgroundColor: Theme.of(context).brightness == Brightness.dark
+            ? Colors.black
+            : null,
+        foregroundColor: Theme.of(context).brightness == Brightness.dark
+            ? Colors.white
+            : null,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),

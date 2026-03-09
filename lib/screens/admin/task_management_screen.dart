@@ -213,6 +213,12 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
         title: const Text('Gestionar Actividades'),
         leading: BackButton(onPressed: () => Navigator.pop(context)),
         elevation: 0,
+        backgroundColor: Theme.of(context).brightness == Brightness.dark
+            ? Colors.black
+            : null,
+        foregroundColor: Theme.of(context).brightness == Brightness.dark
+            ? Colors.white
+            : null,
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddDialog,

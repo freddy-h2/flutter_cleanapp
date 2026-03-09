@@ -491,17 +491,15 @@ class _LimpyAppState extends State<LimpyApp> {
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(28),
-          boxShadow: [
-            BoxShadow(
-              color: Theme.of(context).shadowColor.withValues(
-                alpha: Theme.of(context).brightness == Brightness.dark
-                    ? 0.3
-                    : 0.1,
-              ),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          boxShadow: Theme.of(context).brightness == Brightness.dark
+              ? null
+              : [
+                  BoxShadow(
+                    color: Theme.of(context).shadowColor.withValues(alpha: 0.1),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(28),
@@ -521,6 +519,9 @@ class _LimpyAppState extends State<LimpyApp> {
               inactiveColor: Theme.of(context).brightness == Brightness.dark
                   ? CupertinoColors.systemGrey
                   : CupertinoColors.inactiveGray,
+              border: Theme.of(context).brightness == Brightness.dark
+                  ? const Border()
+                  : null,
               items: const [
                 BottomNavigationBarItem(
                   icon: Icon(CupertinoIcons.calendar),
