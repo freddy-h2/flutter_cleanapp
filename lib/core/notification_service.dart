@@ -92,6 +92,9 @@ class NotificationService {
   /// Notification ID base for prorroga (extension request) notifications.
   static const int _prorrogaBaseId = 3000;
 
+  /// Notification ID base for announcement notifications.
+  static const int _announcementBaseId = 4000;
+
   /// Show a notification for a new anonymous comment received by the
   /// responsible user.
   ///
@@ -132,6 +135,16 @@ class NotificationService {
       title: 'Limpy - Prorroga Rechazada',
       body: 'Tu solicitud de prorroga ha sido rechazada',
     );
+  }
+
+  /// Show a notification for a new announcement.
+  ///
+  /// [title] is the announcement title and [body] is the announcement message.
+  Future<void> notifyAnnouncement({
+    required String title,
+    required String body,
+  }) async {
+    await show(id: _announcementBaseId, title: 'Limpy - $title', body: body);
   }
 
   /// Schedule countdown notifications for a cleaning period.

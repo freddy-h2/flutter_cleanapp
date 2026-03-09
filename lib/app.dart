@@ -5,6 +5,7 @@ import 'package:flutter_cleanapp/core/theme/app_theme.dart';
 import 'package:flutter_cleanapp/data/supabase_service.dart';
 import 'package:flutter_cleanapp/models/user_model.dart';
 import 'package:flutter_cleanapp/screens/activities_screen.dart';
+import 'package:flutter_cleanapp/screens/admin/feedback_screen.dart';
 import 'package:flutter_cleanapp/screens/auth_screen.dart';
 import 'package:flutter_cleanapp/screens/calendar_screen.dart';
 import 'package:flutter_cleanapp/screens/comments_screen.dart';
@@ -89,6 +90,53 @@ class _LimpyAppState extends State<LimpyApp> {
 
   Future<void> _logout() async {
     await SupabaseConfig.client.auth.signOut();
+  }
+
+  /// Shows a dialog for sending anonymous app feedback.
+  Future<void> _showFeedbackDialog() async {
+    final controller = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: _navigatorKey.currentContext!,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Comentario sobre la App'),
+        content: TextField(
+          controller: controller,
+          maxLines: 4,
+          maxLength: 500,
+          decoration: const InputDecoration(
+            hintText: 'Escribe tu comentario anónimo...',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Enviar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && controller.text.trim().isNotEmpty) {
+      try {
+        await SupabaseService.instance.sendFeedback(controller.text.trim());
+        if (mounted) {
+          ScaffoldMessenger.of(_navigatorKey.currentContext!).showSnackBar(
+            const SnackBar(content: Text('Comentario enviado. ¡Gracias!')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            _navigatorKey.currentContext!,
+          ).showSnackBar(SnackBar(content: Text('Error al enviar: $e')));
+        }
+      }
+    }
+    controller.dispose();
   }
 
   List<Widget> get _screens => [
@@ -178,6 +226,12 @@ class _LimpyAppState extends State<LimpyApp> {
                       .then((changed) {
                         if (changed == true && mounted) _loadCurrentUser();
                       });
+                case 'feedback':
+                  _showFeedbackDialog();
+                case 'admin_feedback':
+                  _navigatorKey.currentState?.push(
+                    MaterialPageRoute(builder: (_) => const FeedbackScreen()),
+                  );
                 case 'logout':
                   _logout();
               }
@@ -203,6 +257,27 @@ class _LimpyAppState extends State<LimpyApp> {
                   ],
                 ),
               ),
+              PopupMenuItem(
+                value: 'feedback',
+                child: const Row(
+                  children: [
+                    Icon(Icons.feedback_outlined),
+                    SizedBox(width: 12),
+                    Text('Comentario sobre la App'),
+                  ],
+                ),
+              ),
+              if (_currentUser?.isAdmin == true)
+                PopupMenuItem(
+                  value: 'admin_feedback',
+                  child: const Row(
+                    children: [
+                      Icon(Icons.campaign_outlined),
+                      SizedBox(width: 12),
+                      Text('Gestionar Comunicados'),
+                    ],
+                  ),
+                ),
               const PopupMenuDivider(),
               PopupMenuItem(
                 value: 'logout',
