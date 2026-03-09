@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_cleanapp/core/realtime_service.dart';
 import 'package:flutter_cleanapp/data/supabase_service.dart';
 import 'package:flutter_cleanapp/models/cleaning_schedule.dart';
 import 'package:flutter_cleanapp/models/comment.dart';
@@ -26,15 +29,34 @@ class _CommentsScreenState extends State<CommentsScreen>
   UserModel? _responsible;
   List<Comment> _receivedComments = [];
 
+  late final StreamSubscription<void> _commentsRealtimeSub;
+  late final StreamSubscription<void> _schedulesRealtimeSub;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _loadData();
+    _commentsRealtimeSub = RealtimeService.instance.onCommentsChanged.listen((
+      _,
+    ) {
+      if (mounted) {
+        _loadData();
+      }
+    });
+    _schedulesRealtimeSub = RealtimeService.instance.onSchedulesChanged.listen((
+      _,
+    ) {
+      if (mounted) {
+        _loadData();
+      }
+    });
   }
 
   @override
   void dispose() {
+    _commentsRealtimeSub.cancel();
+    _schedulesRealtimeSub.cancel();
     _tabController.dispose();
     _messageController.dispose();
     super.dispose();

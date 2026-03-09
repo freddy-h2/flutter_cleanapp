@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_cleanapp/core/realtime_service.dart';
 import 'package:flutter_cleanapp/data/supabase_service.dart';
 import 'package:flutter_cleanapp/models/cleaning_schedule.dart';
 import 'package:flutter_cleanapp/models/extension_request.dart';
@@ -43,10 +46,33 @@ class _HomeScreenState extends State<HomeScreen> {
   /// Loading state for accept/reject buttons.
   bool _isResolvingRequest = false;
 
+  late final StreamSubscription<void> _schedulesRealtimeSub;
+  late final StreamSubscription<void> _extensionsRealtimeSub;
+
   @override
   void initState() {
     super.initState();
     _loadData();
+    _schedulesRealtimeSub = RealtimeService.instance.onSchedulesChanged.listen((
+      _,
+    ) {
+      if (mounted) {
+        _loadData();
+      }
+    });
+    _extensionsRealtimeSub = RealtimeService.instance.onExtensionsChanged
+        .listen((_) {
+          if (mounted) {
+            _loadData();
+          }
+        });
+  }
+
+  @override
+  void dispose() {
+    _schedulesRealtimeSub.cancel();
+    _extensionsRealtimeSub.cancel();
+    super.dispose();
   }
 
   Future<void> _loadData() async {

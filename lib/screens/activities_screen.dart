@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_cleanapp/core/realtime_service.dart';
 import 'package:flutter_cleanapp/data/supabase_service.dart';
 import 'package:flutter_cleanapp/models/cleaning_schedule.dart';
 import 'package:flutter_cleanapp/models/cleaning_task.dart';
@@ -23,10 +26,32 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
   bool _isLoading = true;
   CleaningSchedule? _currentSchedule;
 
+  late final StreamSubscription<void> _tasksRealtimeSub;
+  late final StreamSubscription<void> _schedulesRealtimeSub;
+
   @override
   void initState() {
     super.initState();
     _loadTasks();
+    _tasksRealtimeSub = RealtimeService.instance.onTasksChanged.listen((_) {
+      if (mounted) {
+        _loadTasks();
+      }
+    });
+    _schedulesRealtimeSub = RealtimeService.instance.onSchedulesChanged.listen((
+      _,
+    ) {
+      if (mounted) {
+        _loadTasks();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _tasksRealtimeSub.cancel();
+    _schedulesRealtimeSub.cancel();
+    super.dispose();
   }
 
   Future<void> _loadTasks() async {
