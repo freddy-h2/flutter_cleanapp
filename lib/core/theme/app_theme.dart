@@ -96,8 +96,22 @@ abstract final class AppTheme {
     ),
     scaffoldBackgroundColor: Colors.black,
     cupertinoOverrideTheme: const CupertinoThemeData(
-      barBackgroundColor: Colors.black,
       brightness: Brightness.dark,
+      barBackgroundColor: Color(0xDD121212),
+      scaffoldBackgroundColor: Colors.black,
+      primaryColor: CupertinoColors.activeBlue,
+      textTheme: CupertinoTextThemeData(
+        navTitleTextStyle: TextStyle(
+          color: Colors.white,
+          fontSize: 17,
+          fontWeight: FontWeight.w600,
+        ),
+        navLargeTitleTextStyle: TextStyle(
+          color: Colors.white,
+          fontSize: 34,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
     ),
     textTheme: GoogleFonts.interTextTheme(
       ThemeData(brightness: Brightness.dark).textTheme,

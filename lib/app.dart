@@ -450,20 +450,10 @@ class _LimpyAppState extends State<LimpyApp> {
   Widget _buildMainShell() {
     return Scaffold(
       appBar: CupertinoNavigationBar(
-        middle: Text(
-          _currentTitle,
-          style: Theme.of(context).brightness == Brightness.dark
-              ? const TextStyle(color: Colors.white)
-              : null,
-        ),
+        middle: Text(_currentTitle),
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,
-          child: Icon(
-            CupertinoIcons.bell,
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Colors.white
-                : null,
-          ),
+          child: const Icon(CupertinoIcons.bell),
           onPressed: () {
             _navigatorKey.currentState?.push(
               CupertinoPageRoute(builder: (_) => const NotificationsScreen()),
@@ -471,19 +461,9 @@ class _LimpyAppState extends State<LimpyApp> {
           },
         ),
         backgroundColor: Theme.of(context).brightness == Brightness.dark
-            ? Colors.black
+            ? const Color(0xFF000000)
             : Theme.of(context).colorScheme.surface.withValues(alpha: 0.85),
-        brightness: Theme.of(context).brightness == Brightness.dark
-            ? Brightness.dark
-            : null,
         border: null,
-        // In dark mode, disable automatic background visibility which lerps
-        // the bar color with the scaffold background (overriding our black).
-        // Also disable the internal backdrop filter blur.
-        automaticBackgroundVisibility:
-            Theme.of(context).brightness != Brightness.dark,
-        enableBackgroundFilterBlur:
-            Theme.of(context).brightness != Brightness.dark,
         transitionBetweenRoutes: false,
       ),
       body: IndexedStack(index: _currentIndex, children: _screens),

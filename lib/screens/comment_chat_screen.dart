@@ -280,17 +280,11 @@ class _CommentChatScreenState extends State<CommentChatScreen> {
 
     return Scaffold(
       appBar: CupertinoNavigationBar(
-        middle: Text(
-          'Comentario anónimo',
-          style: isDark ? const TextStyle(color: Colors.white) : null,
-        ),
+        middle: const Text('Comentario anónimo'),
         backgroundColor: isDark
-            ? Colors.black
+            ? const Color(0xFF000000)
             : colorScheme.surface.withValues(alpha: 0.85),
-        brightness: isDark ? Brightness.dark : null,
         border: null,
-        automaticBackgroundVisibility: !isDark,
-        enableBackgroundFilterBlur: !isDark,
       ),
       body: Column(
         children: [

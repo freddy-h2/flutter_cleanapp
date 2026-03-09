@@ -148,23 +148,11 @@ class _ExtensionRequestsScreenState extends State<ExtensionRequestsScreen> {
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
-        middle: Text(
-          'Gestionar Prórrogas',
-          style: Theme.of(context).brightness == Brightness.dark
-              ? const TextStyle(color: Colors.white)
-              : null,
-        ),
+        middle: const Text('Gestionar Prórrogas'),
         backgroundColor: Theme.of(context).brightness == Brightness.dark
-            ? Colors.black
+            ? const Color(0xFF000000)
             : Theme.of(context).colorScheme.surface.withValues(alpha: 0.85),
-        brightness: Theme.of(context).brightness == Brightness.dark
-            ? Brightness.dark
-            : null,
         border: null,
-        automaticBackgroundVisibility:
-            Theme.of(context).brightness != Brightness.dark,
-        enableBackgroundFilterBlur:
-            Theme.of(context).brightness != Brightness.dark,
       ),
       child: SafeArea(
         child: _isLoading
