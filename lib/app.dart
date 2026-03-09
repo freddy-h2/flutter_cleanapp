@@ -1,3 +1,4 @@
+import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_cleanapp/core/realtime_service.dart';
 import 'package:flutter_cleanapp/core/supabase_config.dart';
@@ -31,12 +32,20 @@ class _LimpyAppState extends State<LimpyApp> {
   bool _isLoadingUser = false;
 
   final _navigatorKey = GlobalKey<NavigatorState>();
+  late final AppLinks _appLinks;
 
   @override
   void initState() {
     super.initState();
     _checkAuth();
     RealtimeService.instance.subscribe();
+    _appLinks = AppLinks();
+    _appLinks.uriLinkStream.listen((uri) {
+      _handleDeepLink(uri);
+    });
+    _appLinks.getInitialLink().then((uri) {
+      if (uri != null) _handleDeepLink(uri);
+    });
     SupabaseConfig.client.auth.onAuthStateChange.listen((data) {
       final event = data.event;
       if (event == AuthChangeEvent.signedIn ||
@@ -90,6 +99,18 @@ class _LimpyAppState extends State<LimpyApp> {
 
   Future<void> _logout() async {
     await SupabaseConfig.client.auth.signOut();
+  }
+
+  void _handleDeepLink(Uri uri) {
+    if (uri.scheme == 'limpy' && uri.host == 'reset-callback') {
+      if (_isAuthenticated && _currentUser != null) {
+        _navigatorKey.currentState?.push(
+          MaterialPageRoute(
+            builder: (_) => ProfileScreen(currentUser: _currentUser!),
+          ),
+        );
+      }
+    }
   }
 
   /// Shows a dialog for sending anonymous app feedback.
