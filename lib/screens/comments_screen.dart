@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_cleanapp/core/notification_service.dart';
 import 'package:flutter_cleanapp/core/realtime_service.dart';
 import 'package:flutter_cleanapp/data/supabase_service.dart';
 import 'package:flutter_cleanapp/models/cleaning_schedule.dart';
@@ -28,6 +29,9 @@ class _CommentsScreenState extends State<CommentsScreen>
   CleaningSchedule? _currentWeekSchedule;
   UserModel? _responsible;
   List<Comment> _receivedComments = [];
+
+  /// Tracks the last known comment count to detect new incoming comments.
+  int _lastKnownCommentCount = 0;
 
   late final StreamSubscription<void> _commentsRealtimeSub;
   late final StreamSubscription<void> _schedulesRealtimeSub;
@@ -85,10 +89,26 @@ class _CommentsScreenState extends State<CommentsScreen>
       }
 
       if (mounted) {
+        // Notify the responsible user when new comments arrive (but not on
+        // the very first load, and not for the user's own send actions).
+        final isResponsible =
+            schedule != null && schedule.userId == widget.currentUser.id;
+        if (isResponsible &&
+            _lastKnownCommentCount > 0 &&
+            comments.length > _lastKnownCommentCount) {
+          final newCount = comments.length - _lastKnownCommentCount;
+          for (var i = 0; i < newCount; i++) {
+            NotificationService.instance.notifyNewComment(
+              commentIndex: _lastKnownCommentCount + i,
+            );
+          }
+        }
+
         setState(() {
           _currentWeekSchedule = schedule;
           _responsible = responsible;
           _receivedComments = comments;
+          _lastKnownCommentCount = comments.length;
           _isLoading = false;
         });
       }

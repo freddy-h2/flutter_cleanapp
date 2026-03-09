@@ -50,6 +50,14 @@ class _HomeScreenState extends State<HomeScreen> {
   /// Loading state for accept/reject buttons.
   bool _isResolvingRequest = false;
 
+  /// ID of the last incoming request we already notified about, to avoid
+  /// duplicate notifications on every reload.
+  String? _notifiedIncomingRequestId;
+
+  /// ID of the user's own pending outgoing request, tracked so we can detect
+  /// when it transitions to accepted or rejected.
+  String? _ownPendingRequestId;
+
   late final StreamSubscription<void> _schedulesRealtimeSub;
   late final StreamSubscription<void> _extensionsRealtimeSub;
 
@@ -184,12 +192,44 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// Loads the incoming extension request (if any) where the current user is
   /// the next_user_id, and fetches the requester's user info.
+  ///
+  /// Also checks whether the user's own outgoing request was accepted or
+  /// rejected and fires a local notification accordingly.
   Future<void> _loadIncomingRequest(List<CleaningSchedule> schedules) async {
     try {
       final currentUser = widget.currentUser;
       final requests = await SupabaseService.instance
           .getExtensionRequestsForUser(currentUser.id);
 
+      // ── Detect accept/reject of the user's own outgoing request ──────────
+      if (_ownPendingRequestId != null) {
+        final ownRequest = requests
+            .where((r) => r.id == _ownPendingRequestId)
+            .firstOrNull;
+        if (ownRequest != null) {
+          if (ownRequest.status == ExtensionRequestStatus.accepted) {
+            NotificationService.instance.notifyProrrogaAccepted();
+            _ownPendingRequestId = null;
+          } else if (ownRequest.status == ExtensionRequestStatus.rejected) {
+            NotificationService.instance.notifyProrrogaRejected();
+            _ownPendingRequestId = null;
+          }
+        }
+      }
+
+      // Track the user's own new pending outgoing request.
+      final ownPending = requests
+          .where(
+            (r) =>
+                r.status == ExtensionRequestStatus.pending &&
+                r.requesterId == currentUser.id,
+          )
+          .firstOrNull;
+      if (ownPending != null && _ownPendingRequestId == null) {
+        _ownPendingRequestId = ownPending.id;
+      }
+
+      // ── Detect new incoming request ───────────────────────────────────────
       final incoming = requests
           .where(
             (r) =>
@@ -213,6 +253,14 @@ class _HomeScreenState extends State<HomeScreen> {
       UserModel? requester;
       final users = await SupabaseService.instance.getUsers();
       requester = users.where((u) => u.id == incoming.requesterId).firstOrNull;
+
+      // Notify only once per unique incoming request.
+      if (incoming.id != _notifiedIncomingRequestId) {
+        _notifiedIncomingRequestId = incoming.id;
+        NotificationService.instance.notifyProrrogaReceived(
+          requesterName: requester?.name ?? 'Un vecino',
+        );
+      }
 
       if (mounted) {
         setState(() {

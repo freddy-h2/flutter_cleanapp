@@ -86,6 +86,54 @@ class NotificationService {
   /// Notification ID base for cleaning period countdown notifications.
   static const int _cleaningBaseId = 1000;
 
+  /// Notification ID base for anonymous comment notifications.
+  static const int _commentBaseId = 2000;
+
+  /// Notification ID base for prorroga (extension request) notifications.
+  static const int _prorrogaBaseId = 3000;
+
+  /// Show a notification for a new anonymous comment received by the
+  /// responsible user.
+  ///
+  /// [commentIndex] is used to generate a unique notification ID so that
+  /// multiple comment notifications can coexist.
+  Future<void> notifyNewComment({required int commentIndex}) async {
+    await show(
+      id: _commentBaseId + (commentIndex % 100),
+      title: 'Limpy - Nuevo Comentario',
+      body: 'Has recibido un comentario anonimo sobre tu aseo',
+    );
+  }
+
+  /// Show a notification for an incoming prorroga request.
+  ///
+  /// [requesterName] is the display name of the user who sent the request.
+  Future<void> notifyProrrogaReceived({required String requesterName}) async {
+    await show(
+      id: _prorrogaBaseId,
+      title: 'Limpy - Solicitud de Prorroga',
+      body: '$requesterName solicita que tomes su turno de aseo',
+    );
+  }
+
+  /// Show a notification when the current user's prorroga request is accepted.
+  Future<void> notifyProrrogaAccepted() async {
+    await show(
+      id: _prorrogaBaseId + 1,
+      title: 'Limpy - Prorroga Aceptada',
+      body: 'Tu solicitud de prorroga ha sido aceptada',
+    );
+  }
+
+  /// Show a notification when the current user's prorroga request is rejected.
+  Future<void> notifyProrrogaRejected() async {
+    await show(
+      id: _prorrogaBaseId + 2,
+      title: 'Limpy - Prorroga Rechazada',
+      body: 'Tu solicitud de prorroga ha sido rechazada',
+    );
+  }
+
   /// Schedule countdown notifications for a cleaning period.
   ///
   /// [startDate] is the first day of the cleaning period.
