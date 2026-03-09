@@ -64,8 +64,12 @@ class _HomeScreenState extends State<HomeScreen> {
   /// when it transitions to accepted or rejected.
   String? _ownPendingRequestId;
 
+  /// Tracks the last known top-level comment count to detect new comments.
+  int _lastKnownCommentCount = 0;
+
   late final StreamSubscription<void> _schedulesRealtimeSub;
   late final StreamSubscription<void> _extensionsRealtimeSub;
+  late final StreamSubscription<void> _commentsRealtimeSub;
 
   @override
   void initState() {
@@ -84,12 +88,20 @@ class _HomeScreenState extends State<HomeScreen> {
             _loadData();
           }
         });
+    _commentsRealtimeSub = RealtimeService.instance.onCommentsChanged.listen((
+      _,
+    ) {
+      if (mounted) {
+        _checkForNewComments();
+      }
+    });
   }
 
   @override
   void dispose() {
     _schedulesRealtimeSub.cancel();
     _extensionsRealtimeSub.cancel();
+    _commentsRealtimeSub.cancel();
     super.dispose();
   }
 
@@ -166,6 +178,13 @@ class _HomeScreenState extends State<HomeScreen> {
             periodEndDate: endDate,
           );
           _notificationsScheduled = true;
+
+          // Initialize comment count to avoid false notifications on first load.
+          try {
+            final comments = await SupabaseService.instance
+                .getCommentsWithReplies(currentPeriodSchedule.id);
+            _lastKnownCommentCount = comments.keys.length;
+          } catch (_) {}
         }
       }
 
@@ -191,6 +210,52 @@ class _HomeScreenState extends State<HomeScreen> {
           context,
         ).showSnackBar(SnackBar(content: Text('Error al cargar datos: $e')));
       }
+    }
+  }
+
+  /// Checks for new comments on the current period's schedule and notifies
+  /// the responsible user.
+  Future<void> _checkForNewComments() async {
+    try {
+      final currentUser = widget.currentUser;
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final periodStart = today.subtract(
+        const Duration(days: SupabaseService.cleaningPeriodDays - 1),
+      );
+
+      // Find current period schedule for this user.
+      CleaningSchedule? currentSchedule;
+      for (final s in _schedules) {
+        final d = DateTime(s.date.year, s.date.month, s.date.day);
+        if (s.userId == currentUser.id &&
+            !d.isBefore(periodStart) &&
+            !d.isAfter(today)) {
+          currentSchedule = s;
+          break;
+        }
+      }
+
+      if (currentSchedule == null) return;
+
+      // Fetch top-level comments count.
+      final comments = await SupabaseService.instance.getCommentsWithReplies(
+        currentSchedule.id,
+      );
+      final topLevelCount = comments.keys.length;
+
+      if (_lastKnownCommentCount > 0 &&
+          topLevelCount > _lastKnownCommentCount) {
+        final newCount = topLevelCount - _lastKnownCommentCount;
+        for (var i = 0; i < newCount; i++) {
+          NotificationService.instance.notifyNewComment(
+            commentIndex: _lastKnownCommentCount + i,
+          );
+        }
+      }
+      _lastKnownCommentCount = topLevelCount;
+    } catch (_) {
+      // Non-fatal
     }
   }
 

@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_cleanapp/core/notification_service.dart';
 import 'package:flutter_cleanapp/core/realtime_service.dart';
 import 'package:flutter_cleanapp/data/supabase_service.dart';
 import 'package:flutter_cleanapp/models/cleaning_schedule.dart';
@@ -41,9 +40,6 @@ class _CommentsScreenState extends State<CommentsScreen> {
 
   /// Reply controllers — one per comment being replied to.
   final Map<String, TextEditingController> _replyControllers = {};
-
-  /// Tracks the last known top-level comment count to detect new comments.
-  int _lastKnownCommentCount = 0;
 
   late final StreamSubscription<void> _commentsRealtimeSub;
   late final StreamSubscription<void> _schedulesRealtimeSub;
@@ -112,26 +108,12 @@ class _CommentsScreenState extends State<CommentsScreen> {
       }
 
       if (mounted) {
-        // Notify the responsible user when new top-level comments arrive.
-        final topLevelCount = commentsWithReplies.keys.length;
-        if (isResponsible &&
-            _lastKnownCommentCount > 0 &&
-            topLevelCount > _lastKnownCommentCount) {
-          final newCount = topLevelCount - _lastKnownCommentCount;
-          for (var i = 0; i < newCount; i++) {
-            NotificationService.instance.notifyNewComment(
-              commentIndex: _lastKnownCommentCount + i,
-            );
-          }
-        }
-
         setState(() {
           _currentWeekSchedule = schedule;
           _responsible = responsible;
           _isResponsible = isResponsible;
           _commentsWithReplies = commentsWithReplies;
           _myCommentsWithReplies = myComments;
-          _lastKnownCommentCount = topLevelCount;
           _isLoading = false;
         });
       }
