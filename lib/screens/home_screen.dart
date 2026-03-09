@@ -31,9 +31,15 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   List<CleaningSchedule> _schedules = [];
+  List<UserModel> _users = [];
   bool _isLoading = true;
   bool _hasExistingRequest = false;
   bool _isRequestingExtension = false;
+  bool _hasExceededProrrogaLimit = false;
+
+  /// ID of the user's own pending outgoing prórroga request, used for
+  /// cancellation.
+  String? _pendingRequestId;
 
   /// Guard flag to avoid scheduling notifications on every reload.
   bool _notificationsScheduled = false;
@@ -90,10 +96,16 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      final schedules = await SupabaseService.instance.getSchedules();
+      final results = await Future.wait([
+        SupabaseService.instance.getSchedules(),
+        SupabaseService.instance.getUsers(),
+      ]);
+      final schedules = results[0] as List<CleaningSchedule>;
+      final users = results[1] as List<UserModel>;
       if (mounted) {
         setState(() {
           _schedules = schedules;
+          _users = users;
           _isLoading = false;
         });
       }
@@ -115,6 +127,9 @@ class _HomeScreenState extends State<HomeScreen> {
       if (currentPeriodSchedule != null) {
         await _checkExistingRequest(currentPeriodSchedule);
       }
+
+      // Check per-cycle prórroga limit.
+      await _checkProrrogaLimit();
 
       // Schedule cleaning countdown notifications when the user is responsible
       // and the cleaning period is not yet completed.
@@ -183,10 +198,30 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         setState(() {
           _hasExistingRequest = existing != null;
+          _pendingRequestId = existing?.id;
         });
       }
     } catch (_) {
       // Non-fatal — leave _hasExistingRequest as false.
+    }
+  }
+
+  /// Checks if the user has already used their prórroga for the current cycle.
+  ///
+  /// A user gets 1 prórroga per cycle. We approximate this by checking for any
+  /// accepted prórroga where the user is the requester and the request was
+  /// created within the last 30 days.
+  Future<void> _checkProrrogaLimit() async {
+    try {
+      final accepted = await SupabaseService.instance
+          .getAcceptedRequestsForRequester(widget.currentUser.id);
+      final cutoff = DateTime.now().subtract(const Duration(days: 30));
+      final recentAccepted = accepted.where((r) => r.createdAt.isAfter(cutoff));
+      if (mounted) {
+        setState(() => _hasExceededProrrogaLimit = recentAccepted.isNotEmpty);
+      }
+    } catch (_) {
+      // Non-fatal — default to false (allow request).
     }
   }
 
@@ -248,11 +283,9 @@ class _HomeScreenState extends State<HomeScreen> {
         return;
       }
 
-      // Try to find the requester in the already-loaded schedules' user list,
-      // otherwise fetch all users.
+      // Find the requester in the already-loaded _users list.
       UserModel? requester;
-      final users = await SupabaseService.instance.getUsers();
-      requester = users.where((u) => u.id == incoming.requesterId).firstOrNull;
+      requester = _users.where((u) => u.id == incoming.requesterId).firstOrNull;
 
       // Notify only once per unique incoming request.
       if (incoming.id != _notifiedIncomingRequestId) {
@@ -327,6 +360,149 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() => _isResolvingRequest = false);
       }
     }
+  }
+
+  /// Cancels the user's own pending prórroga request after confirmation.
+  Future<void> _cancelExtension() async {
+    if (_pendingRequestId == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancelar Prórroga'),
+        content: const Text(
+          '¿Estás seguro de que deseas cancelar la solicitud de prórroga?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('No'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Sí, cancelar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isRequestingExtension = true);
+    try {
+      await SupabaseService.instance.cancelExtensionRequest(_pendingRequestId!);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Solicitud de prórroga cancelada')),
+        );
+        setState(() {
+          _hasExistingRequest = false;
+          _pendingRequestId = null;
+          _ownPendingRequestId = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error al cancelar: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _isRequestingExtension = false);
+    }
+  }
+
+  /// Shows a confirmation dialog with the next user's name, then creates the
+  /// extension request if the user confirms.
+  Future<void> _confirmAndRequestExtension() async {
+    final currentUser = widget.currentUser;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final periodStart = today.subtract(
+      const Duration(days: SupabaseService.cleaningPeriodDays - 1),
+    );
+
+    // Identify the current period's schedule for this user.
+    CleaningSchedule? currentPeriodSchedule;
+    for (final s in _schedules) {
+      final d = DateTime(s.date.year, s.date.month, s.date.day);
+      if (!d.isBefore(periodStart) && !d.isAfter(today)) {
+        currentPeriodSchedule = s;
+        break;
+      }
+    }
+
+    if (currentPeriodSchedule == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'No hay siguiente persona en el calendario para solicitar prórroga',
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
+    // Find the next schedule after the current period where userId differs.
+    CleaningSchedule? nextSchedule;
+    for (final s in _schedules) {
+      if (s.userId != currentUser.id &&
+          s.date.isAfter(currentPeriodSchedule.date)) {
+        if (nextSchedule == null || s.date.isBefore(nextSchedule.date)) {
+          nextSchedule = s;
+        }
+      }
+    }
+
+    if (nextSchedule == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'No hay siguiente persona en el calendario para solicitar prórroga',
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
+    // Look up the next user's name and room from the already-loaded _users list.
+    final nextUser = _users
+        .where((u) => u.id == nextSchedule!.userId)
+        .firstOrNull;
+    final nextUserName = nextUser?.name ?? 'el siguiente usuario';
+    final nextUserRoom = nextUser?.room ?? '';
+
+    // Show confirmation dialog.
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirmar Prórroga'),
+        content: Text(
+          '¿Deseas intercambiar tu periodo de aseo con $nextUserName'
+          '${nextUserRoom.isNotEmpty ? ' ($nextUserRoom)' : ''}?\n\n'
+          'Tu periodo será intercambiado con el siguiente turno.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Confirmar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    // Proceed with creating the extension request.
+    await _requestExtension();
   }
 
   /// Sends an extension request for the current period's schedule.
@@ -602,15 +778,36 @@ class _HomeScreenState extends State<HomeScreen> {
               onPressed: widget.onNavigateToActivities,
             ),
             const SizedBox(height: 12),
-            OutlinedButton.icon(
-              icon: const Icon(Icons.schedule_send),
-              label: Text(
-                _hasExistingRequest ? 'Prórroga solicitada' : 'Pedir Prórroga',
+            if (_hasExistingRequest) ...[
+              OutlinedButton.icon(
+                icon: const Icon(Icons.cancel_outlined),
+                label: const Text('Cancelar Prórroga'),
+                onPressed: _isRequestingExtension ? null : _cancelExtension,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: colorScheme.error,
+                ),
               ),
-              onPressed: (_hasExistingRequest || _isRequestingExtension)
-                  ? null
-                  : _requestExtension,
-            ),
+            ] else if (_hasExceededProrrogaLimit) ...[
+              OutlinedButton.icon(
+                icon: const Icon(Icons.schedule_send),
+                label: const Text('Pedir Prórroga'),
+                onPressed: null,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Has excedido las prórrogas permitidas en este periodo',
+                style: textTheme.bodySmall?.copyWith(color: colorScheme.error),
+                textAlign: TextAlign.center,
+              ),
+            ] else ...[
+              OutlinedButton.icon(
+                icon: const Icon(Icons.schedule_send),
+                label: const Text('Pedir Prórroga'),
+                onPressed: _isRequestingExtension
+                    ? null
+                    : _confirmAndRequestExtension,
+              ),
+            ],
           ],
         ),
       );
