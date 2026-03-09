@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_cleanapp/core/realtime_service.dart';
 import 'package:flutter_cleanapp/data/supabase_service.dart';
 import 'package:flutter_cleanapp/models/cleaning_schedule.dart';
 import 'package:flutter_cleanapp/models/extension_request.dart';
@@ -23,6 +26,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
   List<ExtensionRequest> _extensionRequests = [];
   bool _isLoading = true;
 
+  late final StreamSubscription<void> _schedulesRealtimeSub;
+  late final StreamSubscription<void> _extensionsRealtimeSub;
+
   static const List<String> _monthNames = [
     'Enero',
     'Febrero',
@@ -42,6 +48,26 @@ class _CalendarScreenState extends State<CalendarScreen> {
   void initState() {
     super.initState();
     _loadSchedules();
+    _schedulesRealtimeSub = RealtimeService.instance.onSchedulesChanged.listen((
+      _,
+    ) {
+      if (mounted) {
+        _loadSchedules();
+      }
+    });
+    _extensionsRealtimeSub = RealtimeService.instance.onExtensionsChanged
+        .listen((_) {
+          if (mounted) {
+            _loadSchedules();
+          }
+        });
+  }
+
+  @override
+  void dispose() {
+    _schedulesRealtimeSub.cancel();
+    _extensionsRealtimeSub.cancel();
+    super.dispose();
   }
 
   Future<void> _loadSchedules() async {
