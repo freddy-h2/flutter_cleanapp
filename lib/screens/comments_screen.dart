@@ -82,6 +82,14 @@ class _CommentsScreenState extends State<CommentsScreen> {
     super.dispose();
   }
 
+  @override
+  void didUpdateWidget(CommentsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isResponsible != widget.isResponsible) {
+      _loadData();
+    }
+  }
+
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
