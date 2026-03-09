@@ -27,6 +27,7 @@ class CommentsScreen extends StatefulWidget {
 
 class _CommentsScreenState extends State<CommentsScreen> {
   final TextEditingController _messageController = TextEditingController();
+  final ScrollController _senderScrollController = ScrollController();
 
   bool _isLoading = true;
   CleaningSchedule? _currentWeekSchedule;
@@ -70,6 +71,7 @@ class _CommentsScreenState extends State<CommentsScreen> {
     _commentsRealtimeSub.cancel();
     _schedulesRealtimeSub.cancel();
     _messageController.dispose();
+    _senderScrollController.dispose();
     for (final controller in _replyControllers.values) {
       controller.dispose();
     }
@@ -153,6 +155,14 @@ class _CommentsScreenState extends State<CommentsScreen> {
       );
       if (mounted) {
         _messageController.clear();
+        // Scroll to bottom (index 0 since list is reversed).
+        if (_senderScrollController.hasClients) {
+          _senderScrollController.animateTo(
+            0,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('¡Comentario enviado de forma anónima!'),
@@ -275,137 +285,169 @@ class _CommentsScreenState extends State<CommentsScreen> {
     );
   }
 
-  /// Builds the sender view for non-responsible users.
+  /// Builds the sender view for non-responsible users (WhatsApp-style).
   Widget _buildSenderView() {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Icon(
-            CupertinoIcons.bubble_left,
-            size: 48,
-            color: colorScheme.primary,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Comentarios Anónimos',
-            style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Tu mensaje será enviado de forma anónima',
-            style: textTheme.bodyMedium?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          Card(
-            child: _responsible != null
-                ? ListTile(
-                    leading: const CircleAvatar(
-                      child: Icon(CupertinoIcons.person_fill),
-                    ),
-                    title: const Text('Responsable actual'),
-                    subtitle: Text(
-                      '${_responsible!.name} — ${_responsible!.room}',
-                    ),
-                  )
-                : const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text('No hay responsable asignado esta semana'),
-                  ),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _messageController,
-            maxLines: 4,
-            maxLength: 280,
-            decoration: InputDecoration(
-              hintText: 'Escribe tu comentario aquí...',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              filled: true,
-            ),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: FilledButton.icon(
-              onPressed: _sendComment,
-              icon: const Icon(CupertinoIcons.paperplane_fill),
-              label: const Text('Enviar Comentario'),
-            ),
-          ),
-          if (_myCommentsWithReplies.isNotEmpty) ...[
-            const SizedBox(height: 24),
-            const Divider(),
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Mis comentarios',
-                style: textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            for (final entry in _myCommentsWithReplies.entries)
-              _buildSentCommentConversation(entry.key, entry.value),
-          ],
-        ],
-      ),
+    return Column(
+      children: [
+        _buildSenderHeader(),
+        Expanded(child: _buildSenderMessages()),
+        _buildSenderInputBar(),
+      ],
     );
   }
 
-  /// Builds a chat-style conversation for a sent comment and its replies.
-  Widget _buildSentCommentConversation(Comment comment, List<Comment> replies) {
-    final colorScheme = Theme.of(context).colorScheme;
+  /// Compact header showing the responsible user info.
+  Widget _buildSenderHeader() {
     final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
 
-    // Sort replies chronologically.
-    final sortedReplies = [...replies]
-      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: _responsible != null
+              ? Row(
+                  children: [
+                    const CircleAvatar(child: Icon(CupertinoIcons.person_fill)),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Responsable: ${_responsible!.name}',
+                          style: textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          _responsible!.room,
+                          style: textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                )
+              : Text(
+                  'No hay responsable asignado esta semana',
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+        ),
+        const Divider(height: 1),
+      ],
+    );
+  }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // User's sent message — right-aligned bubble.
+  /// Scrollable message area showing all conversations chronologically.
+  Widget _buildSenderMessages() {
+    if (_myCommentsWithReplies.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              CupertinoIcons.bubble_left,
+              size: 48,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Envía un comentario anónimo',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Build a flat list of all bubbles in chronological order, then reverse
+    // for the reversed ListView (newest at bottom).
+    final entries = _myCommentsWithReplies.entries.toList()
+      ..sort((a, b) => a.key.createdAt.compareTo(b.key.createdAt));
+
+    final List<Widget> items = [];
+    for (final entry in entries) {
+      final comment = entry.key;
+      final replies = [...entry.value]
+        ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
+      items.add(
+        _buildChatBubble(
+          message: comment.message,
+          time: _formatTime(comment.createdAt),
+          isMe: true,
+        ),
+      );
+      for (final reply in replies) {
+        items.add(
           _buildChatBubble(
-            message: comment.message,
-            time: _formatTime(comment.createdAt),
-            isMe: true,
+            message: reply.message,
+            time: _formatTime(reply.createdAt),
+            isMe: false,
+            senderLabel: _responsible?.name ?? 'Responsable',
           ),
-          // Replies from responsible — left-aligned bubbles.
-          if (sortedReplies.isEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                'Sin respuesta aún',
-                style: textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
+        );
+      }
+      items.add(const SizedBox(height: 16));
+    }
+
+    // Reverse so that ListView(reverse: true) shows newest at bottom.
+    final reversedItems = items.reversed.toList();
+
+    return ListView.builder(
+      controller: _senderScrollController,
+      reverse: true,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      itemCount: reversedItems.length,
+      itemBuilder: (_, index) => reversedItems[index],
+    );
+  }
+
+  /// Input bar pinned at the bottom of the sender view.
+  Widget _buildSenderInputBar() {
+    return SafeArea(
+      top: false,
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border(
+            top: BorderSide(color: Theme.of(context).dividerColor),
+          ),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _messageController,
+                maxLines: 1,
+                maxLength: 280,
+                decoration: InputDecoration(
+                  hintText: 'Escribe un comentario...',
+                  counterText: '',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                  isDense: true,
                 ),
               ),
-            )
-          else
-            for (final reply in sortedReplies)
-              _buildChatBubble(
-                message: reply.message,
-                time: _formatTime(reply.createdAt),
-                isMe: false,
-                senderLabel: _responsible?.name ?? 'Responsable',
-              ),
-        ],
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(CupertinoIcons.paperplane_fill),
+              tooltip: 'Enviar comentario',
+              onPressed: _sendComment,
+            ),
+          ],
+        ),
       ),
     );
   }
