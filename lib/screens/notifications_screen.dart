@@ -159,7 +159,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         border: null,
       ),
       child: SafeArea(
-        top: false,
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : _announcements.isEmpty

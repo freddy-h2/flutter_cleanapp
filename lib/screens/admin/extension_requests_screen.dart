@@ -155,7 +155,6 @@ class _ExtensionRequestsScreenState extends State<ExtensionRequestsScreen> {
         border: null,
       ),
       child: SafeArea(
-        top: false,
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : _requests.isEmpty

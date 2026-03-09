@@ -369,9 +369,9 @@ class _LimpyAppState extends State<LimpyApp> {
             );
           },
         ),
-        backgroundColor: Theme.of(
-          context,
-        ).colorScheme.surface.withValues(alpha: 0.85),
+        backgroundColor: Theme.of(context).brightness == Brightness.dark
+            ? Theme.of(context).colorScheme.surface
+            : Theme.of(context).colorScheme.surface.withValues(alpha: 0.85),
         border: null,
       ),
       body: IndexedStack(index: _currentIndex, children: _screens),
@@ -381,7 +381,11 @@ class _LimpyAppState extends State<LimpyApp> {
           borderRadius: BorderRadius.circular(28),
           boxShadow: [
             BoxShadow(
-              color: Theme.of(context).shadowColor.withValues(alpha: 0.1),
+              color: Theme.of(context).shadowColor.withValues(
+                alpha: Theme.of(context).brightness == Brightness.dark
+                    ? 0.3
+                    : 0.1,
+              ),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -395,9 +399,11 @@ class _LimpyAppState extends State<LimpyApp> {
               currentIndex: _currentIndex,
               onTap: (index) => setState(() => _currentIndex = index),
               activeColor: CupertinoColors.activeBlue,
-              backgroundColor: Theme.of(
-                context,
-              ).colorScheme.surface.withValues(alpha: 0.7),
+              backgroundColor: Theme.of(context).brightness == Brightness.dark
+                  ? Theme.of(context).colorScheme.surface
+                  : Theme.of(
+                      context,
+                    ).colorScheme.surface.withValues(alpha: 0.7),
               items: const [
                 BottomNavigationBarItem(
                   icon: Icon(CupertinoIcons.calendar),

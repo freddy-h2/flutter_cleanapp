@@ -109,7 +109,6 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
         border: null,
       ),
       child: SafeArea(
-        top: false,
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : ListView.builder(
