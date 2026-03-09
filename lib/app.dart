@@ -380,7 +380,7 @@ class _LimpyAppState extends State<LimpyApp> {
           },
         ),
         backgroundColor: Theme.of(context).brightness == Brightness.dark
-            ? const Color(0xFF121212).withValues(alpha: 0.94)
+            ? Colors.black
             : Theme.of(context).colorScheme.surface.withValues(alpha: 0.85),
         brightness: Theme.of(context).brightness == Brightness.dark
             ? Brightness.dark
@@ -413,7 +413,7 @@ class _LimpyAppState extends State<LimpyApp> {
               onTap: (index) => setState(() => _currentIndex = index),
               activeColor: CupertinoColors.activeBlue,
               backgroundColor: Theme.of(context).brightness == Brightness.dark
-                  ? const Color(0xFF121212).withValues(alpha: 0.94)
+                  ? Colors.black
                   : Theme.of(
                       context,
                     ).colorScheme.surface.withValues(alpha: 0.7),
