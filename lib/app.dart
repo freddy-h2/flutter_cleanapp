@@ -370,8 +370,11 @@ class _LimpyAppState extends State<LimpyApp> {
           },
         ),
         backgroundColor: Theme.of(context).brightness == Brightness.dark
-            ? Theme.of(context).colorScheme.surface
+            ? const Color(0xFF1C1C1E)
             : Theme.of(context).colorScheme.surface.withValues(alpha: 0.85),
+        brightness: Theme.of(context).brightness == Brightness.dark
+            ? Brightness.dark
+            : null,
         border: null,
       ),
       body: IndexedStack(index: _currentIndex, children: _screens),
@@ -400,10 +403,13 @@ class _LimpyAppState extends State<LimpyApp> {
               onTap: (index) => setState(() => _currentIndex = index),
               activeColor: CupertinoColors.activeBlue,
               backgroundColor: Theme.of(context).brightness == Brightness.dark
-                  ? Theme.of(context).colorScheme.surface
+                  ? const Color(0xFF000000).withValues(alpha: 0.7)
                   : Theme.of(
                       context,
                     ).colorScheme.surface.withValues(alpha: 0.7),
+              inactiveColor: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.grey
+                  : CupertinoColors.inactiveGray,
               items: const [
                 BottomNavigationBarItem(
                   icon: Icon(CupertinoIcons.calendar),
