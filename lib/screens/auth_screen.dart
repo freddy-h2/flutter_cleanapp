@@ -44,6 +44,7 @@ class _AuthScreenState extends State<AuthScreen> {
         await SupabaseConfig.client.auth.signUp(
           email: _emailController.text.trim(),
           password: _passwordController.text,
+          emailRedirectTo: 'limpy://reset-callback',
           data: {
             'name': _nameController.text.trim(),
             'room': _roomController.text.trim(),
@@ -130,7 +131,10 @@ class _AuthScreenState extends State<AuthScreen> {
         return;
       }
       try {
-        await SupabaseConfig.client.auth.resetPasswordForEmail(email);
+        await SupabaseConfig.client.auth.resetPasswordForEmail(
+          email,
+          redirectTo: 'limpy://reset-callback',
+        );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(

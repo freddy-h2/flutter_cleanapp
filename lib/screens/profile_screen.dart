@@ -147,7 +147,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final currentEmail = SupabaseConfig.client.auth.currentUser?.email ?? '';
     if (currentEmail.isEmpty) return;
     try {
-      await SupabaseConfig.client.auth.resetPasswordForEmail(currentEmail);
+      await SupabaseConfig.client.auth.resetPasswordForEmail(
+        currentEmail,
+        redirectTo: 'limpy://reset-callback',
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -174,6 +177,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       await SupabaseConfig.client.auth.updateUser(
         UserAttributes(email: newEmail),
+        emailRedirectTo: 'limpy://reset-callback',
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
