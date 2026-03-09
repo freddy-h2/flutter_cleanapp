@@ -325,6 +325,53 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
     }
   }
 
+  Future<void> _confirmDeleteAll() async {
+    final count = _schedules.length;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Eliminar todo'),
+        content: Text(
+          '¿Estás seguro de que deseas eliminar todas las $count '
+          'entradas del calendario? Esta acción no se puede deshacer.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Eliminar todo'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      setState(() => _isLoading = true);
+      try {
+        for (final schedule in _schedules) {
+          await SupabaseService.instance.deleteSchedule(schedule.id);
+        }
+        await _loadData();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Todas las entradas eliminadas')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error al eliminar: $e')));
+        }
+      }
+    }
+  }
+
   Future<void> _showCycleGeneratorDialog() async {
     await Navigator.push<void>(
       context,
@@ -342,6 +389,12 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
         title: const Text('Gestionar Calendario'),
         leading: BackButton(onPressed: () => Navigator.pop(context)),
         actions: [
+          if (_schedules.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.delete_sweep),
+              tooltip: 'Eliminar todo',
+              onPressed: _confirmDeleteAll,
+            ),
           IconButton(
             icon: const Icon(Icons.auto_awesome),
             tooltip: 'Generar por ciclos',
