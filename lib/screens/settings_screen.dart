@@ -57,6 +57,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _obscureCurrentPassword = true;
   bool _obscureNewPassword = true;
   bool _obscureConfirmPassword = true;
+  bool _showPasswordSection = false;
 
   // Email fields
   final _newEmailController = TextEditingController();
@@ -146,6 +147,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _currentPasswordController.clear();
         _newPasswordController.clear();
         _confirmPasswordController.clear();
+        setState(() => _showPasswordSection = false);
       }
     } on AuthException catch (e) {
       if (mounted) {
@@ -297,96 +299,111 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             // ── Change Password section ──────────────────────────────
             Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      'Cambiar Contraseña',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+              child: Column(
+                children: [
+                  ListTile(
+                    leading: const Icon(CupertinoIcons.lock),
+                    title: const Text('Cambiar Contraseña'),
+                    trailing: Icon(
+                      _showPasswordSection
+                          ? CupertinoIcons.chevron_up
+                          : CupertinoIcons.chevron_down,
                     ),
-                    const SizedBox(height: 16),
-                    // Current password
-                    TextFormField(
-                      controller: _currentPasswordController,
-                      obscureText: _obscureCurrentPassword,
-                      decoration: InputDecoration(
-                        labelText: 'Contraseña actual',
-                        prefixIcon: const Icon(CupertinoIcons.lock),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscureCurrentPassword
-                                ? CupertinoIcons.eye
-                                : CupertinoIcons.eye_slash,
-                          ),
-                          onPressed: () => setState(
-                            () => _obscureCurrentPassword =
-                                !_obscureCurrentPassword,
-                          ),
-                        ),
-                      ),
+                    onTap: () => setState(
+                      () => _showPasswordSection = !_showPasswordSection,
                     ),
-                    const SizedBox(height: 12),
-                    // New password
-                    TextFormField(
-                      controller: _newPasswordController,
-                      obscureText: _obscureNewPassword,
-                      decoration: InputDecoration(
-                        labelText: 'Nueva contraseña',
-                        prefixIcon: const Icon(CupertinoIcons.lock_fill),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscureNewPassword
-                                ? CupertinoIcons.eye
-                                : CupertinoIcons.eye_slash,
+                  ),
+                  if (_showPasswordSection) ...[
+                    const Divider(height: 1),
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Current password
+                          TextFormField(
+                            controller: _currentPasswordController,
+                            obscureText: _obscureCurrentPassword,
+                            decoration: InputDecoration(
+                              labelText: 'Contraseña actual',
+                              prefixIcon: const Icon(CupertinoIcons.lock),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscureCurrentPassword
+                                      ? CupertinoIcons.eye
+                                      : CupertinoIcons.eye_slash,
+                                ),
+                                onPressed: () => setState(
+                                  () => _obscureCurrentPassword =
+                                      !_obscureCurrentPassword,
+                                ),
+                              ),
+                            ),
                           ),
-                          onPressed: () => setState(
-                            () => _obscureNewPassword = !_obscureNewPassword,
+                          const SizedBox(height: 12),
+                          // New password
+                          TextFormField(
+                            controller: _newPasswordController,
+                            obscureText: _obscureNewPassword,
+                            decoration: InputDecoration(
+                              labelText: 'Nueva contraseña',
+                              prefixIcon: const Icon(CupertinoIcons.lock_fill),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscureNewPassword
+                                      ? CupertinoIcons.eye
+                                      : CupertinoIcons.eye_slash,
+                                ),
+                                onPressed: () => setState(
+                                  () => _obscureNewPassword =
+                                      !_obscureNewPassword,
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
+                          const SizedBox(height: 12),
+                          // Confirm new password
+                          TextFormField(
+                            controller: _confirmPasswordController,
+                            obscureText: _obscureConfirmPassword,
+                            decoration: InputDecoration(
+                              labelText: 'Confirmar nueva contraseña',
+                              prefixIcon: const Icon(CupertinoIcons.lock_fill),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscureConfirmPassword
+                                      ? CupertinoIcons.eye
+                                      : CupertinoIcons.eye_slash,
+                                ),
+                                onPressed: () => setState(
+                                  () => _obscureConfirmPassword =
+                                      !_obscureConfirmPassword,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            height: 48,
+                            child: FilledButton(
+                              onPressed: _isChangingPassword
+                                  ? null
+                                  : _changePassword,
+                              child: _isChangingPassword
+                                  ? const CircularProgressIndicator()
+                                  : const Text('Cambiar Contraseña'),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          TextButton(
+                            onPressed: _forgotPassword,
+                            child: const Text('¿Olvidaste tu contraseña?'),
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    // Confirm new password
-                    TextFormField(
-                      controller: _confirmPasswordController,
-                      obscureText: _obscureConfirmPassword,
-                      decoration: InputDecoration(
-                        labelText: 'Confirmar nueva contraseña',
-                        prefixIcon: const Icon(CupertinoIcons.lock_fill),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscureConfirmPassword
-                                ? CupertinoIcons.eye
-                                : CupertinoIcons.eye_slash,
-                          ),
-                          onPressed: () => setState(
-                            () => _obscureConfirmPassword =
-                                !_obscureConfirmPassword,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      height: 48,
-                      child: FilledButton(
-                        onPressed: _isChangingPassword ? null : _changePassword,
-                        child: _isChangingPassword
-                            ? const CircularProgressIndicator()
-                            : const Text('Cambiar Contraseña'),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextButton(
-                      onPressed: _forgotPassword,
-                      child: const Text('¿Olvidaste tu contraseña?'),
                     ),
                   ],
-                ),
+                ],
               ),
             ),
 
