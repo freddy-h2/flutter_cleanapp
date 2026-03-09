@@ -282,15 +282,19 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
     );
   }
 
-  Future<void> _confirmDelete(CleaningSchedule schedule) async {
+  Future<void> _confirmDeletePeriod(_SchedulePeriod period) async {
+    final userName = _userName(period.userId);
+    final firstDate = _formatDate(period.schedules.first.date);
+    final lastDate = _formatDate(period.schedules.last.date);
+    final dateText = period.schedules.length > 1
+        ? 'del $firstDate al $lastDate'
+        : 'del $firstDate';
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Eliminar entrada'),
-        content: Text(
-          '¿Eliminar la entrada de ${_userName(schedule.userId)} '
-          'del ${_formatDate(schedule.date)}?',
-        ),
+        title: const Text('Eliminar periodo'),
+        content: Text('¿Eliminar el periodo de $userName $dateText?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -307,7 +311,9 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
 
     if (confirmed == true) {
       try {
-        await SupabaseService.instance.deleteSchedule(schedule.id);
+        for (final schedule in period.schedules) {
+          await SupabaseService.instance.deleteSchedule(schedule.id);
+        }
         await _loadData();
       } catch (e) {
         if (mounted) {
@@ -352,43 +358,73 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
           ? const Center(child: CircularProgressIndicator())
           : _schedules.isEmpty
           ? const Center(child: Text('No hay entradas en el calendario.'))
-          : ListView.builder(
-              itemCount: _schedules.length,
-              itemBuilder: (context, index) {
-                final schedule = _schedules[index];
-                return Card(
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  child: ListTile(
-                    title: Text(_userName(schedule.userId)),
-                    subtitle: Text(
-                      '${_userRoom(schedule.userId)} · '
-                      '${_formatDate(schedule.date)}',
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          schedule.isCompleted
-                              ? Icons.check_circle
-                              : Icons.radio_button_unchecked,
-                          color: schedule.isCompleted ? Colors.green : null,
+          : Builder(
+              builder: (context) {
+                // Group consecutive same-user schedules into periods.
+                final periods = <_SchedulePeriod>[];
+                for (final schedule in _schedules) {
+                  if (periods.isNotEmpty &&
+                      periods.last.userId == schedule.userId) {
+                    periods.last.schedules.add(schedule);
+                  } else {
+                    periods.add(
+                      _SchedulePeriod(
+                        userId: schedule.userId,
+                        schedules: [schedule],
+                      ),
+                    );
+                  }
+                }
+                return ListView.builder(
+                  itemCount: periods.length,
+                  itemBuilder: (context, index) {
+                    final period = periods[index];
+                    final firstDate = period.schedules.first.date;
+                    final lastDate = period.schedules.last.date;
+                    final allCompleted = period.schedules.every(
+                      (s) => s.isCompleted,
+                    );
+
+                    final dateText = period.schedules.length > 1
+                        ? '${_formatDate(firstDate)} al '
+                              '${_formatDate(lastDate)}'
+                        : _formatDate(firstDate);
+
+                    return Card(
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      child: ListTile(
+                        title: Text(_userName(period.userId)),
+                        subtitle: Text(
+                          '${_userRoom(period.userId)} · $dateText',
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.edit),
-                          tooltip: 'Editar',
-                          onPressed: () => _showEditDialog(schedule),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              allCompleted
+                                  ? Icons.check_circle
+                                  : Icons.radio_button_unchecked,
+                              color: allCompleted ? Colors.green : null,
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.edit),
+                              tooltip: 'Editar',
+                              onPressed: () =>
+                                  _showEditDialog(period.schedules.first),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              tooltip: 'Eliminar',
+                              onPressed: () => _confirmDeletePeriod(period),
+                            ),
+                          ],
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                          tooltip: 'Eliminar',
-                          onPressed: () => _confirmDelete(schedule),
-                        ),
-                      ],
-                    ),
-                  ),
+                      ),
+                    );
+                  },
                 );
               },
             ),
@@ -713,4 +749,15 @@ class _CycleGeneratorPageState extends State<_CycleGeneratorPage> {
       ),
     );
   }
+}
+
+/// Groups consecutive same-user [CleaningSchedule] entries into a period.
+class _SchedulePeriod {
+  _SchedulePeriod({required this.userId, required this.schedules});
+
+  /// The user ID shared by all schedules in this period.
+  final String userId;
+
+  /// The schedules belonging to this period (consecutive days).
+  final List<CleaningSchedule> schedules;
 }
