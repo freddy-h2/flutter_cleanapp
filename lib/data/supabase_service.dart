@@ -588,6 +588,9 @@ class SupabaseService {
   // --- Announcements ---
 
   /// Creates a new announcement (admin only).
+  ///
+  /// If [type] is [AnnouncementType.update], all existing active update
+  /// announcements are deactivated first so only the newest one stays active.
   Future<void> createAnnouncement({
     required String senderId,
     required String title,
@@ -595,6 +598,14 @@ class SupabaseService {
     required AnnouncementType type,
     String? link,
   }) async {
+    // If publishing a new update, deactivate all previous active updates.
+    if (type == AnnouncementType.update) {
+      await SupabaseConfig.client
+          .from('announcements')
+          .update({'is_active': false})
+          .eq('type', 'update')
+          .eq('is_active', true);
+    }
     await SupabaseConfig.client.from('announcements').insert({
       'sender_id': senderId,
       'title': title,
