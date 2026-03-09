@@ -52,7 +52,18 @@ class _LimpyAppState extends State<LimpyApp> {
     });
     SupabaseConfig.client.auth.onAuthStateChange.listen((data) {
       final event = data.event;
-      if (event == AuthChangeEvent.signedIn ||
+      if (event == AuthChangeEvent.passwordRecovery) {
+        // User arrived via password reset link — show dialog immediately.
+        // Set the flag in case the user isn't fully loaded yet.
+        _pendingPasswordReset = true;
+        _loadCurrentUser().then((_) {
+          if (_pendingPasswordReset &&
+              _isAuthenticated &&
+              _currentUser != null) {
+            _showPasswordResetDialog();
+          }
+        });
+      } else if (event == AuthChangeEvent.signedIn ||
           event == AuthChangeEvent.tokenRefreshed ||
           event == AuthChangeEvent.userUpdated) {
         _loadCurrentUser().then((_) {
