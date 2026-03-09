@@ -38,6 +38,12 @@ abstract final class AppTheme {
       centerTitle: true,
       scrolledUnderElevation: 2,
     ),
+    navigationBarTheme: NavigationBarThemeData(
+      height: 70,
+      indicatorShape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+    ),
   );
 
   /// Dark theme configuration.
@@ -67,6 +73,12 @@ abstract final class AppTheme {
     appBarTheme: const AppBarTheme(
       centerTitle: true,
       scrolledUnderElevation: 2,
+    ),
+    navigationBarTheme: NavigationBarThemeData(
+      height: 70,
+      indicatorShape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
     ),
   );
 }

@@ -12,15 +12,15 @@ import 'package:flutter_cleanapp/screens/profile_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Root application widget that owns theme state and bottom navigation.
-class CleanApp extends StatefulWidget {
-  /// Creates a [CleanApp].
-  const CleanApp({super.key});
+class LimpyApp extends StatefulWidget {
+  /// Creates a [LimpyApp].
+  const LimpyApp({super.key});
 
   @override
-  State<CleanApp> createState() => _CleanAppState();
+  State<LimpyApp> createState() => _LimpyAppState();
 }
 
-class _CleanAppState extends State<CleanApp> {
+class _LimpyAppState extends State<LimpyApp> {
   AppThemeMode _themeMode = AppThemeMode.system;
   int _currentIndex = 0;
 
@@ -148,17 +148,61 @@ class _CleanAppState extends State<CleanApp> {
   Widget _buildMainShell() {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('CleanApp'),
+        title: const Text('Limpy'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: _logout,
-            tooltip: 'Cerrar sesión',
-          ),
-          IconButton(
-            icon: Icon(_themeModeIcon),
-            onPressed: _toggleTheme,
-            tooltip: 'Cambiar tema',
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            tooltip: 'Menú',
+            onSelected: (value) {
+              switch (value) {
+                case 'theme':
+                  _toggleTheme();
+                case 'profile':
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ProfileScreen(currentUser: _currentUser!),
+                    ),
+                  );
+                case 'logout':
+                  _logout();
+              }
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'theme',
+                child: ListTile(
+                  leading: Icon(_themeModeIcon),
+                  title: const Text('Cambiar tema'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'profile',
+                child: ListTile(
+                  leading: Icon(Icons.person),
+                  title: Text('Administrar perfil'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              const PopupMenuDivider(),
+              PopupMenuItem(
+                value: 'logout',
+                child: ListTile(
+                  leading: Icon(
+                    Icons.logout,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                  title: Text(
+                    'Cerrar sesión',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -195,7 +239,7 @@ class _CleanAppState extends State<CleanApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'CleanApp',
+      title: 'Limpy',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
