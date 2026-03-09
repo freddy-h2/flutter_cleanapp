@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_cleanapp/core/realtime_service.dart';
 import 'package:flutter_cleanapp/data/supabase_service.dart';
@@ -207,6 +208,73 @@ class _CommentsScreenState extends State<CommentsScreen> {
     }
   }
 
+  /// Builds a chat bubble widget.
+  ///
+  /// [isMe] = true → right-aligned with [ColorScheme.primaryContainer].
+  /// [isMe] = false → left-aligned with [secondaryContainer] (sender view)
+  /// or [surfaceContainerHighest] (inbox view, controlled by [bgColor]).
+  Widget _buildChatBubble({
+    required String message,
+    required String time,
+    required bool isMe,
+    String? senderLabel,
+    Color? bgColor,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    final backgroundColor =
+        bgColor ??
+        (isMe ? colorScheme.primaryContainer : colorScheme.secondaryContainer);
+    final onColor = isMe
+        ? colorScheme.onPrimaryContainer
+        : colorScheme.onSecondaryContainer;
+
+    return Align(
+      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: screenWidth * 0.75),
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            crossAxisAlignment: isMe
+                ? CrossAxisAlignment.end
+                : CrossAxisAlignment.start,
+            children: [
+              if (senderLabel != null) ...[
+                Text(
+                  senderLabel,
+                  style: textTheme.labelSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: onColor,
+                  ),
+                ),
+                const SizedBox(height: 2),
+              ],
+              Text(
+                message,
+                style: textTheme.bodyMedium?.copyWith(color: onColor),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                time,
+                style: textTheme.bodySmall?.copyWith(
+                  color: onColor.withValues(alpha: 0.7),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   /// Builds the sender view for non-responsible users.
   Widget _buildSenderView() {
     final colorScheme = Theme.of(context).colorScheme;
@@ -217,7 +285,11 @@ class _CommentsScreenState extends State<CommentsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Icon(Icons.message_outlined, size: 48, color: colorScheme.primary),
+          Icon(
+            CupertinoIcons.bubble_left,
+            size: 48,
+            color: colorScheme.primary,
+          ),
           const SizedBox(height: 12),
           Text(
             'Comentarios Anónimos',
@@ -236,7 +308,9 @@ class _CommentsScreenState extends State<CommentsScreen> {
           Card(
             child: _responsible != null
                 ? ListTile(
-                    leading: const CircleAvatar(child: Icon(Icons.person)),
+                    leading: const CircleAvatar(
+                      child: Icon(CupertinoIcons.person_fill),
+                    ),
                     title: const Text('Responsable actual'),
                     subtitle: Text(
                       '${_responsible!.name} — ${_responsible!.room}',
@@ -266,7 +340,7 @@ class _CommentsScreenState extends State<CommentsScreen> {
             height: 48,
             child: FilledButton.icon(
               onPressed: _sendComment,
-              icon: const Icon(Icons.send),
+              icon: const Icon(CupertinoIcons.paperplane_fill),
               label: const Text('Enviar Comentario'),
             ),
           ),
@@ -285,75 +359,52 @@ class _CommentsScreenState extends State<CommentsScreen> {
             ),
             const SizedBox(height: 8),
             for (final entry in _myCommentsWithReplies.entries)
-              _buildSentCommentTile(entry.key, entry.value),
+              _buildSentCommentConversation(entry.key, entry.value),
           ],
         ],
       ),
     );
   }
 
-  /// Builds an [ExpansionTile] for a sent comment with its replies.
-  Widget _buildSentCommentTile(Comment comment, List<Comment> replies) {
+  /// Builds a chat-style conversation for a sent comment and its replies.
+  Widget _buildSentCommentConversation(Comment comment, List<Comment> replies) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      child: ExpansionTile(
-        title: Text(
-          comment.message,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-        subtitle: Text(_formatTime(comment.createdAt)),
+    // Sort replies chronologically.
+    final sortedReplies = [...replies]
+      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (replies.isEmpty)
+          // User's sent message — right-aligned bubble.
+          _buildChatBubble(
+            message: comment.message,
+            time: _formatTime(comment.createdAt),
+            isMe: true,
+          ),
+          // Replies from responsible — left-aligned bubbles.
+          if (sortedReplies.isEmpty)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.only(top: 4),
               child: Text(
                 'Sin respuesta aún',
-                style: textTheme.bodyMedium?.copyWith(
+                style: textTheme.bodySmall?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                 ),
               ),
             )
           else
-            for (final reply in replies)
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: colorScheme.secondaryContainer,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _responsible?.name ?? 'Responsable',
-                      style: textTheme.labelMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.onSecondaryContainer,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      reply.message,
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onSecondaryContainer,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _formatTime(reply.createdAt),
-                      style: textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSecondaryContainer,
-                      ),
-                    ),
-                  ],
-                ),
+            for (final reply in sortedReplies)
+              _buildChatBubble(
+                message: reply.message,
+                time: _formatTime(reply.createdAt),
+                isMe: false,
+                senderLabel: _responsible?.name ?? 'Responsable',
               ),
-          const SizedBox(height: 8),
         ],
       ),
     );
@@ -369,7 +420,7 @@ class _CommentsScreenState extends State<CommentsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Icon(Icons.inbox, size: 48, color: colorScheme.primary),
+          Icon(CupertinoIcons.tray, size: 48, color: colorScheme.primary),
           const SizedBox(height: 12),
           Text(
             'Buzón de Comentarios',
@@ -389,73 +440,52 @@ class _CommentsScreenState extends State<CommentsScreen> {
             const Center(child: Text('No tienes comentarios aún'))
           else
             for (final entry in _commentsWithReplies.entries)
-              _buildInboxCommentTile(entry.key, entry.value),
+              _buildInboxCommentConversation(entry.key, entry.value),
         ],
       ),
     );
   }
 
-  /// Builds an expandable [Card] for an inbox comment with reply capability.
-  Widget _buildInboxCommentTile(Comment comment, List<Comment> replies) {
+  /// Builds a chat-style conversation for an inbox comment with reply
+  /// capability.
+  Widget _buildInboxCommentConversation(
+    Comment comment,
+    List<Comment> replies,
+  ) {
     final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
 
     // Ensure a reply controller exists for this comment.
     _replyControllers.putIfAbsent(comment.id, () => TextEditingController());
     final replyController = _replyControllers[comment.id]!;
 
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      child: ExpansionTile(
-        leading: CircleAvatar(
-          backgroundColor: colorScheme.secondaryContainer,
-          child: Icon(
-            Icons.person_off,
-            color: colorScheme.onSecondaryContainer,
-          ),
-        ),
-        title: Text(comment.message),
-        subtitle: Text(_formatTime(comment.createdAt)),
+    // Sort replies chronologically.
+    final sortedReplies = [...replies]
+      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Existing replies.
-          for (final reply in replies)
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Tú',
-                    style: textTheme.labelMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: colorScheme.onPrimaryContainer,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    reply.message,
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: colorScheme.onPrimaryContainer,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _formatTime(reply.createdAt),
-                    style: textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onPrimaryContainer,
-                    ),
-                  ),
-                ],
-              ),
+          // Anonymous comment — left-aligned bubble.
+          _buildChatBubble(
+            message: comment.message,
+            time: _formatTime(comment.createdAt),
+            isMe: false,
+            senderLabel: 'Anónimo',
+            bgColor: colorScheme.surfaceContainerHighest,
+          ),
+          // Replies from responsible (current user) — right-aligned bubbles.
+          for (final reply in sortedReplies)
+            _buildChatBubble(
+              message: reply.message,
+              time: _formatTime(reply.createdAt),
+              isMe: true,
+              senderLabel: 'Tú',
             ),
-          // Quick reply suggestions
+          // Quick reply suggestion chips.
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            padding: const EdgeInsets.only(top: 8),
             child: Wrap(
               spacing: 8,
               runSpacing: 4,
@@ -473,7 +503,7 @@ class _CommentsScreenState extends State<CommentsScreen> {
           ),
           // Reply input row.
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            padding: const EdgeInsets.only(top: 8),
             child: Row(
               children: [
                 Expanded(
@@ -488,13 +518,15 @@ class _CommentsScreenState extends State<CommentsScreen> {
                 ),
                 const SizedBox(width: 8),
                 IconButton(
-                  icon: const Icon(Icons.send),
+                  icon: const Icon(CupertinoIcons.paperplane_fill),
                   tooltip: 'Enviar respuesta',
                   onPressed: () => _sendReply(comment),
                 ),
               ],
             ),
           ),
+          const SizedBox(height: 16),
+          const Divider(),
         ],
       ),
     );
