@@ -5,6 +5,7 @@ import 'package:flutter_cleanapp/core/realtime_service.dart';
 import 'package:flutter_cleanapp/data/supabase_service.dart';
 import 'package:flutter_cleanapp/models/cleaning_schedule.dart';
 import 'package:flutter_cleanapp/models/cleaning_task.dart';
+import 'package:flutter_cleanapp/models/extension_request.dart';
 import 'package:flutter_cleanapp/models/user_model.dart';
 import 'package:flutter_cleanapp/screens/admin/task_management_screen.dart';
 
@@ -82,14 +83,37 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
       }).firstOrNull;
 
       if (schedule != null) {
-        final tasks = await SupabaseService.instance.getTasks();
-        if (mounted) {
-          setState(() {
-            _currentSchedule = schedule;
-            _hasSchedule = true;
-            _tasks = tasks;
-            _isLoading = false;
-          });
+        // Check if the user has an accepted prórroga that swapped them out.
+        // This handles the race condition where the schedule row hasn't been
+        // updated yet but the extension request is already accepted.
+        final extensions = await SupabaseService.instance
+            .getExtensionRequestsForUser(widget.currentUser.id);
+        final hasAcceptedProrroga = extensions.any(
+          (e) =>
+              e.status == ExtensionRequestStatus.accepted &&
+              e.requesterId == widget.currentUser.id &&
+              e.scheduleId == schedule.id,
+        );
+
+        if (hasAcceptedProrroga) {
+          if (mounted) {
+            setState(() {
+              _currentSchedule = null;
+              _hasSchedule = false;
+              _tasks = [];
+              _isLoading = false;
+            });
+          }
+        } else {
+          final tasks = await SupabaseService.instance.getTasks();
+          if (mounted) {
+            setState(() {
+              _currentSchedule = schedule;
+              _hasSchedule = true;
+              _tasks = tasks;
+              _isLoading = false;
+            });
+          }
         }
       } else {
         if (mounted) {

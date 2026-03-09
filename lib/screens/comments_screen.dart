@@ -206,7 +206,9 @@ class _CommentsScreenState extends State<CommentsScreen> {
 
     final backgroundColor =
         bgColor ??
-        (isMe ? colorScheme.primaryContainer : colorScheme.secondaryContainer);
+        (isMe
+            ? colorScheme.primaryContainer
+            : colorScheme.surfaceContainerHighest);
     final onColor = isMe
         ? colorScheme.onPrimaryContainer
         : colorScheme.onSecondaryContainer;
