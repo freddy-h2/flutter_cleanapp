@@ -131,9 +131,14 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
     final colorScheme = Theme.of(context).colorScheme;
     if (_currentSchedule != null) {
       try {
+        // Mark the schedule as completed
         await SupabaseService.instance.updateSchedule(
           _currentSchedule!.id,
           isCompleted: true,
+        );
+        // Delete all comments for this schedule
+        await SupabaseService.instance.deleteCommentsForSchedule(
+          _currentSchedule!.id,
         );
       } catch (e) {
         // Ignore errors — still show success message locally

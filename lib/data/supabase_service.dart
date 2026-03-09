@@ -241,6 +241,16 @@ class SupabaseService {
     });
   }
 
+  /// Deletes all comments linked to [scheduleId].
+  ///
+  /// Called when a cleaning period is finalized to clean up ephemeral feedback.
+  Future<void> deleteCommentsForSchedule(String scheduleId) async {
+    await SupabaseConfig.client
+        .from('comments')
+        .delete()
+        .eq('schedule_id', scheduleId);
+  }
+
   // --- Extension Requests ---
 
   /// Returns all extension requests where [userId] is the requester or the
