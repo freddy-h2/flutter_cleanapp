@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_cleanapp/core/realtime_service.dart';
 import 'package:flutter_cleanapp/data/supabase_service.dart';
@@ -14,8 +15,17 @@ class ActivitiesScreen extends StatefulWidget {
   /// The currently authenticated user.
   final UserModel currentUser;
 
+  /// Whether the current user is responsible for cleaning this week.
+  ///
+  /// Computed centrally in app.dart and passed down to avoid redundant queries.
+  final bool isResponsible;
+
   /// Creates an [ActivitiesScreen].
-  const ActivitiesScreen({super.key, required this.currentUser});
+  const ActivitiesScreen({
+    super.key,
+    required this.currentUser,
+    required this.isResponsible,
+  });
 
   @override
   State<ActivitiesScreen> createState() => _ActivitiesScreenState();
@@ -66,6 +76,20 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
   Future<void> _loadTasks() async {
     setState(() => _isLoading = true);
     try {
+      // If the user is not responsible this week, skip all schedule/prórroga
+      // queries and immediately show the 'libre' state.
+      if (!widget.isResponsible) {
+        if (mounted) {
+          setState(() {
+            _currentSchedule = null;
+            _hasSchedule = false;
+            _tasks = [];
+            _isLoading = false;
+          });
+        }
+        return;
+      }
+
       final now = DateTime.now();
       final currentMonday = now.subtract(Duration(days: now.weekday - 1));
       final currentWeekStart = DateTime(
@@ -208,12 +232,13 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.event_available, size: 64, color: colorScheme.outline),
-            const SizedBox(height: 16),
-            Text(
-              'No tienes aseo asignado esta semana',
-              style: textTheme.bodyLarge,
+            Icon(
+              CupertinoIcons.checkmark_circle,
+              size: 64,
+              color: colorScheme.outline,
             ),
+            const SizedBox(height: 16),
+            Text('¡Estás libre esta semana!', style: textTheme.bodyLarge),
             if (widget.currentUser.isAdmin) ...[
               const SizedBox(height: 24),
               OutlinedButton.icon(

@@ -26,7 +26,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Future<void> _loadAnnouncements() async {
     try {
       final announcements = await SupabaseService.instance
-          .getAllAnnouncements();
+          .getActiveAnnouncements();
       // Sort: update-type first, then avisos. Within each group, newest first.
       announcements.sort((a, b) {
         final aIsUpdate = a.type == AnnouncementType.update;
@@ -121,19 +121,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               _formatDate(announcement.createdAt),
               style: Theme.of(context).textTheme.bodySmall,
             ),
-            if (!announcement.isActive) ...[
-              const SizedBox(height: 4),
-              Chip(
-                label: const Text('Inactivo'),
-                visualDensity: VisualDensity.compact,
-                backgroundColor: colorScheme.surfaceContainerHighest.withValues(
-                  alpha: 0.5,
-                ),
-                labelStyle: TextStyle(
-                  color: colorScheme.onSurface.withValues(alpha: 0.5),
-                ),
-              ),
-            ],
             if (isUpdate && announcement.link != null) ...[
               const SizedBox(height: 12),
               FilledButton.icon(
@@ -152,11 +139,23 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
-        middle: const Text('Notificaciones'),
-        backgroundColor: Theme.of(
-          context,
-        ).colorScheme.surface.withValues(alpha: 0.85),
+        middle: Text(
+          'Notificaciones',
+          style: Theme.of(context).brightness == Brightness.dark
+              ? const TextStyle(color: Colors.white)
+              : null,
+        ),
+        backgroundColor: Theme.of(context).brightness == Brightness.dark
+            ? Colors.black
+            : Theme.of(context).colorScheme.surface.withValues(alpha: 0.85),
+        brightness: Theme.of(context).brightness == Brightness.dark
+            ? Brightness.dark
+            : null,
         border: null,
+        automaticBackgroundVisibility:
+            Theme.of(context).brightness != Brightness.dark,
+        enableBackgroundFilterBlur:
+            Theme.of(context).brightness != Brightness.dark,
       ),
       child: SafeArea(
         child: _isLoading
