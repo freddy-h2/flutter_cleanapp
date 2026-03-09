@@ -1,5 +1,5 @@
 -- ============================================================
--- CleanApp — Full database schema (from scratch)
+-- Limpy — Full database schema (from scratch)
 -- Run this in the Supabase SQL Editor:
 -- https://supabase.com/dashboard/project/qtsymjokdedclwbkunnp/sql
 -- ============================================================

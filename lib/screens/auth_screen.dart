@@ -186,7 +186,7 @@ class _AuthScreenState extends State<AuthScreen> {
               ),
               const SizedBox(height: 16),
               Text(
-                'CleanApp',
+                'Limpy',
                 style: textTheme.headlineLarge?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),

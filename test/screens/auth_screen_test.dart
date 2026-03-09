@@ -68,7 +68,7 @@ void main() {
       await tester.pumpWidget(const MaterialApp(home: AuthScreen()));
       await tester.pumpAndSettle();
 
-      expect(find.text('CleanApp'), findsOneWidget);
+      expect(find.text('Limpy'), findsOneWidget);
     });
 
     testWidgets('toggles back to login from register', (tester) async {

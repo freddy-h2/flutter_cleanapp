@@ -14,7 +14,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Iniciar Sesión'), findsWidgets);
-      expect(find.text('CleanApp'), findsOneWidget);
+      expect(find.text('Limpy'), findsOneWidget);
     });
 
     testWidgets('shows email and password fields', (tester) async {
