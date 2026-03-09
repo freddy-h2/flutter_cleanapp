@@ -98,13 +98,31 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
   }
 
-  /// Returns the extension request for [scheduleId], or null if none.
-  ExtensionRequest? _getRequestForSchedule(String scheduleId) {
-    try {
-      return _extensionRequests.firstWhere((r) => r.scheduleId == scheduleId);
-    } catch (_) {
-      return null;
-    }
+  /// Returns the extension request for [schedule], or null if none.
+  ///
+  /// First tries an exact match by [CleaningSchedule.id]. If none is found,
+  /// also checks whether this schedule was the "other side" of an accepted
+  /// swap: after acceptance the next user's schedule has [requesterId] as its
+  /// [userId], so we match on that.
+  ExtensionRequest? _getRequestForSchedule(CleaningSchedule schedule) {
+    // First try exact match by scheduleId (covers the original/requester schedule)
+    final exactMatch = _extensionRequests
+        .where((r) => r.scheduleId == schedule.id)
+        .firstOrNull;
+    if (exactMatch != null) return exactMatch;
+
+    // For accepted requests, also check if this schedule was the 'other side'
+    // of a swap. After acceptance, the next user's schedule now has requesterId
+    // as its userId. So if schedule.userId == request.requesterId AND the
+    // request is accepted, this schedule was the one that received the
+    // requester in the swap.
+    return _extensionRequests
+        .where(
+          (r) =>
+              r.status == ExtensionRequestStatus.accepted &&
+              r.requesterId == schedule.userId,
+        )
+        .firstOrNull;
   }
 
   /// Returns true if [schedule.date] falls within the current 3-day period.
@@ -215,7 +233,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 final user = entry.user;
                 final currentWeek = _isCurrentPeriod(schedule);
                 final currentUser = _isCurrentUser(schedule);
-                final request = _getRequestForSchedule(schedule.id);
+                final request = _getRequestForSchedule(schedule);
 
                 return Card(
                   margin: const EdgeInsets.symmetric(
