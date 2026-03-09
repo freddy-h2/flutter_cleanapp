@@ -6,13 +6,12 @@ import 'package:flutter_cleanapp/core/theme/app_theme.dart';
 import 'package:flutter_cleanapp/data/supabase_service.dart';
 import 'package:flutter_cleanapp/models/user_model.dart';
 import 'package:flutter_cleanapp/screens/activities_screen.dart';
-import 'package:flutter_cleanapp/screens/admin/feedback_screen.dart';
 import 'package:flutter_cleanapp/screens/auth_screen.dart';
 import 'package:flutter_cleanapp/screens/calendar_screen.dart';
 import 'package:flutter_cleanapp/screens/comments_screen.dart';
 import 'package:flutter_cleanapp/screens/home_screen.dart';
 import 'package:flutter_cleanapp/screens/notifications_screen.dart';
-import 'package:flutter_cleanapp/screens/profile_screen.dart';
+import 'package:flutter_cleanapp/screens/settings_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Root application widget that owns theme state and bottom navigation.
@@ -158,16 +157,20 @@ class _LimpyAppState extends State<LimpyApp> {
   }
 
   List<Widget> get _screens => [
-    ActivitiesScreen(currentUser: _currentUser!),
     CalendarScreen(currentUser: _currentUser!),
+    ActivitiesScreen(currentUser: _currentUser!),
     HomeScreen(
       currentUser: _currentUser!,
-      onNavigateToActivities: () => setState(() => _currentIndex = 0),
+      onNavigateToActivities: () => setState(() => _currentIndex = 1),
     ),
     CommentsScreen(currentUser: _currentUser!),
-    ProfileScreen(
+    SettingsScreen(
       currentUser: _currentUser!,
       onProfileChanged: _loadCurrentUser,
+      themeModeIcon: _themeModeIcon,
+      onToggleTheme: _toggleTheme,
+      onSendFeedback: _showFeedbackDialog,
+      onLogout: _logout,
     ),
   ];
 
@@ -230,91 +233,14 @@ class _LimpyAppState extends State<LimpyApp> {
       appBar: AppBar(
         title: const Text('Limpy'),
         actions: [
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            tooltip: 'Menú',
-            onSelected: (value) {
-              switch (value) {
-                case 'theme':
-                  _toggleTheme();
-                case 'notifications':
-                  _navigatorKey.currentState?.push(
-                    MaterialPageRoute(
-                      builder: (_) => const NotificationsScreen(),
-                    ),
-                  );
-                case 'feedback':
-                  _showFeedbackDialog();
-                case 'admin_feedback':
-                  _navigatorKey.currentState?.push(
-                    MaterialPageRoute(builder: (_) => const FeedbackScreen()),
-                  );
-                case 'logout':
-                  _logout();
-              }
+          IconButton(
+            icon: const Icon(Icons.notifications_outlined),
+            tooltip: 'Notificaciones',
+            onPressed: () {
+              _navigatorKey.currentState?.push(
+                MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+              );
             },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'theme',
-                child: Row(
-                  children: [
-                    Icon(_themeModeIcon),
-                    const SizedBox(width: 12),
-                    const Text('Cambiar tema'),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'notifications',
-                child: const Row(
-                  children: [
-                    Icon(Icons.notifications_outlined),
-                    SizedBox(width: 12),
-                    Text('Notificaciones'),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'feedback',
-                child: const Row(
-                  children: [
-                    Icon(Icons.feedback_outlined),
-                    SizedBox(width: 12),
-                    Text('Comentario sobre la App'),
-                  ],
-                ),
-              ),
-              if (_currentUser?.isAdmin == true)
-                PopupMenuItem(
-                  value: 'admin_feedback',
-                  child: const Row(
-                    children: [
-                      Icon(Icons.campaign_outlined),
-                      SizedBox(width: 12),
-                      Text('Gestionar Comunicados'),
-                    ],
-                  ),
-                ),
-              const PopupMenuDivider(),
-              PopupMenuItem(
-                value: 'logout',
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.logout,
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Cerrar sesión',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
           ),
         ],
       ),
@@ -340,14 +266,14 @@ class _LimpyAppState extends State<LimpyApp> {
             height: 70,
             destinations: const [
               NavigationDestination(
-                icon: Icon(Icons.checklist_outlined),
-                selectedIcon: Icon(Icons.checklist),
-                label: 'Actividades',
-              ),
-              NavigationDestination(
                 icon: Icon(Icons.calendar_month_outlined),
                 selectedIcon: Icon(Icons.calendar_month),
                 label: 'Calendario',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.checklist_outlined),
+                selectedIcon: Icon(Icons.checklist),
+                label: 'Actividades',
               ),
               NavigationDestination(
                 icon: Icon(Icons.home_outlined),
@@ -360,9 +286,9 @@ class _LimpyAppState extends State<LimpyApp> {
                 label: 'Comentarios',
               ),
               NavigationDestination(
-                icon: Icon(Icons.person_outline),
-                selectedIcon: Icon(Icons.person),
-                label: 'Perfil',
+                icon: Icon(Icons.settings_outlined),
+                selectedIcon: Icon(Icons.settings),
+                label: 'Configuración',
               ),
             ],
           ),
