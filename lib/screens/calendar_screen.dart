@@ -25,6 +25,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
   List<UserModel> _users = [];
   List<ExtensionRequest> _extensionRequests = [];
   bool _isLoading = true;
+  bool _isGridView = false;
+  late DateTime _gridMonth;
 
   late final StreamSubscription<void> _schedulesRealtimeSub;
   late final StreamSubscription<void> _extensionsRealtimeSub;
@@ -44,9 +46,21 @@ class _CalendarScreenState extends State<CalendarScreen> {
     'Diciembre',
   ];
 
+  static const List<String> _dayHeaders = [
+    'Lun',
+    'Mar',
+    'Mié',
+    'Jue',
+    'Vie',
+    'Sáb',
+    'Dom',
+  ];
+
   @override
   void initState() {
     super.initState();
+    final now = DateTime.now();
+    _gridMonth = DateTime(now.year, now.month);
     _loadSchedules();
     _schedulesRealtimeSub = RealtimeService.instance.onSchedulesChanged.listen((
       _,
@@ -155,6 +169,307 @@ class _CalendarScreenState extends State<CalendarScreen> {
     return schedule.userId == widget.currentUser.id;
   }
 
+  /// Builds the list view of schedules.
+  Widget _buildListView(
+    List<_ListItem> items,
+    ColorScheme colorScheme,
+    TextTheme textTheme,
+  ) {
+    return ListView.builder(
+      itemCount: items.length,
+      itemBuilder: (context, index) {
+        final item = items[index];
+        if (item is _MonthHeader) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            child: Text(
+              item.label,
+              style: textTheme.titleSmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          );
+        }
+        final period = item as _PeriodEntry;
+        final user = period.user;
+        final firstDate = period.schedules.first.date;
+        final lastDate = period.schedules.last.date;
+        final isCurrentPeriod = period.schedules.any(_isCurrentPeriod);
+        final isCurrentUser = period.schedules.any(_isCurrentUser);
+        final allCompleted = period.schedules.every((s) => s.isCompleted);
+        // Find the first matching extension request across all
+        // schedules in the group.
+        final request = period.schedules
+            .map(_getRequestForSchedule)
+            .nonNulls
+            .firstOrNull;
+
+        final subtitleText = period.schedules.length > 1
+            ? '${user.room} — Periodo del '
+                  '${_formatDate(firstDate)} al '
+                  '${_formatDate(lastDate)}'
+            : '${user.room} — Periodo del ${_formatDate(firstDate)}';
+
+        return Card(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          shape: isCurrentUser
+              ? RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: colorScheme.primary, width: 4),
+                )
+              : null,
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: isCurrentPeriod
+                  ? colorScheme.primary
+                  : colorScheme.surfaceContainerHighest,
+              foregroundColor: isCurrentPeriod
+                  ? colorScheme.onPrimary
+                  : colorScheme.onSurfaceVariant,
+              child: Text(user.name[0]),
+            ),
+            title: Text(user.name),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(subtitleText),
+                if (request != null && request.isPending)
+                  Chip(
+                    label: const Text('Prórroga pendiente'),
+                    avatar: const Icon(Icons.schedule, size: 16),
+                    visualDensity: VisualDensity.compact,
+                    backgroundColor: colorScheme.tertiaryContainer,
+                  ),
+                if (request != null &&
+                    request.status == ExtensionRequestStatus.accepted)
+                  Chip(
+                    label: const Text('Prórroga aceptada'),
+                    avatar: const Icon(Icons.swap_horiz, size: 16),
+                    visualDensity: VisualDensity.compact,
+                    backgroundColor: colorScheme.secondaryContainer,
+                  ),
+              ],
+            ),
+            trailing: allCompleted
+                ? Icon(Icons.check_circle, color: colorScheme.primary)
+                : isCurrentPeriod
+                ? Chip(
+                    label: const Text('Este periodo'),
+                    backgroundColor: colorScheme.primaryContainer,
+                  )
+                : null,
+          ),
+        );
+      },
+    );
+  }
+
+  /// Builds the grid (calendar) view of schedules.
+  Widget _buildGridView(
+    List<CleaningSchedule> schedules,
+    ColorScheme colorScheme,
+    TextTheme textTheme,
+  ) {
+    // Build a map of date -> schedule for quick lookup.
+    final scheduleMap = <DateTime, CleaningSchedule>{};
+    for (final s in schedules) {
+      final dateOnly = DateTime(s.date.year, s.date.month, s.date.day);
+      scheduleMap[dateOnly] = s;
+    }
+
+    // Build user color map.
+    final userColors = <String, Color>{};
+    for (var i = 0; i < _users.length; i++) {
+      userColors[_users[i].id] = Colors.primaries[i % Colors.primaries.length];
+    }
+
+    // Calculate grid layout for _gridMonth.
+    final firstDayOfMonth = DateTime(_gridMonth.year, _gridMonth.month, 1);
+    final lastDayOfMonth = DateTime(_gridMonth.year, _gridMonth.month + 1, 0);
+    // Monday = 1, so offset = (firstDayOfMonth.weekday - 1)
+    final startOffset = firstDayOfMonth.weekday - 1; // 0 = Monday
+    final totalDays = lastDayOfMonth.day;
+    final totalCells = startOffset + totalDays;
+    final rows = (totalCells / 7).ceil();
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    return Column(
+      children: [
+        // Month navigation.
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.chevron_left),
+              onPressed: () => setState(() {
+                _gridMonth = DateTime(_gridMonth.year, _gridMonth.month - 1);
+              }),
+            ),
+            Text(
+              '${_monthNames[_gridMonth.month - 1]} ${_gridMonth.year}',
+              style: textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.chevron_right),
+              onPressed: () => setState(() {
+                _gridMonth = DateTime(_gridMonth.year, _gridMonth.month + 1);
+              }),
+            ),
+          ],
+        ),
+        // Day-of-week headers.
+        Row(
+          children: _dayHeaders
+              .map(
+                (h) => Expanded(
+                  child: Center(
+                    child: Text(
+                      h,
+                      style: textTheme.labelSmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
+        ),
+        const SizedBox(height: 4),
+        // Day grid.
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 7,
+            childAspectRatio: 1,
+          ),
+          itemCount: rows * 7,
+          itemBuilder: (context, index) {
+            final dayIndex = index - startOffset + 1;
+            final isCurrentMonth = dayIndex >= 1 && dayIndex <= totalDays;
+
+            if (!isCurrentMonth) {
+              // Show empty cell for days outside current month.
+              return const SizedBox.shrink();
+            }
+
+            final cellDate = DateTime(
+              _gridMonth.year,
+              _gridMonth.month,
+              dayIndex,
+            );
+            final schedule = scheduleMap[cellDate];
+            final isToday = cellDate == today;
+
+            Color? bgColor;
+            String? initial;
+            bool isCompleted = false;
+
+            if (schedule != null) {
+              final baseColor = userColors[schedule.userId];
+              if (baseColor != null) {
+                bgColor = baseColor.withValues(alpha: 0.3);
+              }
+              final user = _users.firstWhere(
+                (u) => u.id == schedule.userId,
+                orElse: () => const UserModel(id: '', name: '?', room: ''),
+              );
+              initial = user.name.isNotEmpty ? user.name[0] : '?';
+              isCompleted = schedule.isCompleted;
+            }
+
+            return Container(
+              margin: const EdgeInsets.all(1),
+              decoration: BoxDecoration(
+                color: bgColor,
+                borderRadius: BorderRadius.circular(4),
+                border: isToday
+                    ? Border.all(color: colorScheme.primary, width: 2)
+                    : null,
+              ),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        '$dayIndex',
+                        style: textTheme.labelSmall?.copyWith(
+                          fontWeight: isToday
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                          color: isToday
+                              ? colorScheme.primary
+                              : colorScheme.onSurface,
+                        ),
+                      ),
+                      if (initial != null)
+                        Text(
+                          initial,
+                          style: textTheme.labelSmall?.copyWith(
+                            fontSize: 9,
+                            color: colorScheme.onSurface,
+                          ),
+                        ),
+                    ],
+                  ),
+                  if (isCompleted)
+                    Positioned(
+                      top: 1,
+                      right: 1,
+                      child: Icon(
+                        Icons.check,
+                        size: 10,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 8),
+        // Legend.
+        if (_users.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                for (var i = 0; i < _users.length; i++)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: Colors.primaries[i % Colors.primaries.length]
+                              .withValues(alpha: 0.7),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${_users[i].name} (${_users[i].room})',
+                        style: textTheme.labelSmall,
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -206,11 +521,29 @@ class _CalendarScreenState extends State<CalendarScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Calendario de Aseo',
-                  style: textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Calendario de Aseo',
+                        style: textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(
+                        _isGridView
+                            ? Icons.view_list
+                            : Icons.calendar_view_month,
+                      ),
+                      tooltip: _isGridView
+                          ? 'Vista de lista'
+                          : 'Vista de calendario',
+                      onPressed: () =>
+                          setState(() => _isGridView = !_isGridView),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -223,101 +556,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
             ),
           ),
           Expanded(
-            child: ListView.builder(
-              itemCount: items.length,
-              itemBuilder: (context, index) {
-                final item = items[index];
-                if (item is _MonthHeader) {
-                  return Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                    child: Text(
-                      item.label,
-                      style: textTheme.titleSmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  );
-                }
-                final period = item as _PeriodEntry;
-                final user = period.user;
-                final firstDate = period.schedules.first.date;
-                final lastDate = period.schedules.last.date;
-                final isCurrentPeriod = period.schedules.any(_isCurrentPeriod);
-                final isCurrentUser = period.schedules.any(_isCurrentUser);
-                final allCompleted = period.schedules.every(
-                  (s) => s.isCompleted,
-                );
-                // Find the first matching extension request across all
-                // schedules in the group.
-                final request = period.schedules
-                    .map(_getRequestForSchedule)
-                    .nonNulls
-                    .firstOrNull;
-
-                final subtitleText = period.schedules.length > 1
-                    ? '${user.room} — Periodo del '
-                          '${_formatDate(firstDate)} al '
-                          '${_formatDate(lastDate)}'
-                    : '${user.room} — Periodo del ${_formatDate(firstDate)}';
-
-                return Card(
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 4,
-                  ),
-                  shape: isCurrentUser
-                      ? RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(
-                            color: colorScheme.primary,
-                            width: 4,
-                          ),
-                        )
-                      : null,
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: isCurrentPeriod
-                          ? colorScheme.primary
-                          : colorScheme.surfaceContainerHighest,
-                      foregroundColor: isCurrentPeriod
-                          ? colorScheme.onPrimary
-                          : colorScheme.onSurfaceVariant,
-                      child: Text(user.name[0]),
-                    ),
-                    title: Text(user.name),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(subtitleText),
-                        if (request != null && request.isPending)
-                          Chip(
-                            label: const Text('Prórroga pendiente'),
-                            avatar: const Icon(Icons.schedule, size: 16),
-                            visualDensity: VisualDensity.compact,
-                            backgroundColor: colorScheme.tertiaryContainer,
-                          ),
-                        if (request != null &&
-                            request.status == ExtensionRequestStatus.accepted)
-                          Chip(
-                            label: const Text('Prórroga aceptada'),
-                            avatar: const Icon(Icons.swap_horiz, size: 16),
-                            visualDensity: VisualDensity.compact,
-                            backgroundColor: colorScheme.secondaryContainer,
-                          ),
-                      ],
-                    ),
-                    trailing: allCompleted
-                        ? Icon(Icons.check_circle, color: colorScheme.primary)
-                        : isCurrentPeriod
-                        ? Chip(
-                            label: const Text('Este periodo'),
-                            backgroundColor: colorScheme.primaryContainer,
-                          )
-                        : null,
-                  ),
-                );
-              },
-            ),
+            child: _isGridView
+                ? SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: _buildGridView(schedules, colorScheme, textTheme),
+                  )
+                : _buildListView(items, colorScheme, textTheme),
           ),
         ],
       );
