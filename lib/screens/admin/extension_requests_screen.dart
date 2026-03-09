@@ -149,9 +149,9 @@ class _ExtensionRequestsScreenState extends State<ExtensionRequestsScreen> {
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         middle: const Text('Gestionar Prórrogas'),
-        backgroundColor: CupertinoColors.systemBackground.withValues(
-          alpha: 0.8,
-        ),
+        backgroundColor: Theme.of(
+          context,
+        ).colorScheme.surface.withValues(alpha: 0.85),
         border: null,
       ),
       child: SafeArea(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 /// Enum representing the available theme modes for the app.
 enum AppThemeMode { light, dark, system }
@@ -17,7 +18,9 @@ abstract final class AppTheme {
       seedColor: seedColor,
       brightness: Brightness.light,
     ),
-    fontFamily: 'Roboto',
+    textTheme: GoogleFonts.interTextTheme(
+      ThemeData(brightness: Brightness.light).textTheme,
+    ),
     bottomNavigationBarTheme: BottomNavigationBarThemeData(
       selectedItemColor: ColorScheme.fromSeed(
         seedColor: seedColor,
@@ -90,7 +93,9 @@ abstract final class AppTheme {
       seedColor: seedColor,
       brightness: Brightness.dark,
     ),
-    fontFamily: 'Roboto',
+    textTheme: GoogleFonts.interTextTheme(
+      ThemeData(brightness: Brightness.dark).textTheme,
+    ),
     bottomNavigationBarTheme: BottomNavigationBarThemeData(
       selectedItemColor: ColorScheme.fromSeed(
         seedColor: seedColor,

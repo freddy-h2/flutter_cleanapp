@@ -153,9 +153,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         middle: const Text('Notificaciones'),
-        backgroundColor: CupertinoColors.systemBackground.withValues(
-          alpha: 0.8,
-        ),
+        backgroundColor: Theme.of(
+          context,
+        ).colorScheme.surface.withValues(alpha: 0.85),
         border: null,
       ),
       child: SafeArea(

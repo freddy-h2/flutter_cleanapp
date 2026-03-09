@@ -103,9 +103,9 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         middle: const Text('Administrar Usuarios'),
-        backgroundColor: CupertinoColors.systemBackground.withValues(
-          alpha: 0.8,
-        ),
+        backgroundColor: Theme.of(
+          context,
+        ).colorScheme.surface.withValues(alpha: 0.85),
         border: null,
       ),
       child: SafeArea(
