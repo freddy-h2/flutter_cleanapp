@@ -518,4 +518,33 @@ class SupabaseService {
         .order('created_at', ascending: false);
     return data.map((json) => ExtensionRequest.fromJson(json)).toList();
   }
+
+  /// Cancels a pending extension request by marking it as rejected.
+  ///
+  /// Used when the requester wants to withdraw their own request before
+  /// the next user responds. Only affects requests with status 'pending'.
+  Future<void> cancelExtensionRequest(String requestId) async {
+    final now = DateTime.now().toIso8601String();
+    await SupabaseConfig.client
+        .from('extension_requests')
+        .update({'status': 'rejected', 'resolved_at': now})
+        .eq('id', requestId)
+        .eq('status', 'pending');
+  }
+
+  /// Returns all accepted extension requests where [userId] is the requester,
+  /// ordered by creation time (newest first).
+  ///
+  /// Used to enforce the per-cycle prórroga limit.
+  Future<List<ExtensionRequest>> getAcceptedRequestsForRequester(
+    String userId,
+  ) async {
+    final data = await SupabaseConfig.client
+        .from('extension_requests')
+        .select()
+        .eq('requester_id', userId)
+        .eq('status', 'accepted')
+        .order('created_at', ascending: false);
+    return data.map((json) => ExtensionRequest.fromJson(json)).toList();
+  }
 }
