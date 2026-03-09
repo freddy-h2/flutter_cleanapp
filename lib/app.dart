@@ -29,6 +29,8 @@ class _LimpyAppState extends State<LimpyApp> {
   UserModel? _currentUser;
   bool _isLoadingUser = false;
 
+  final _navigatorKey = GlobalKey<NavigatorState>();
+
   @override
   void initState() {
     super.initState();
@@ -166,17 +168,16 @@ class _LimpyAppState extends State<LimpyApp> {
                 case 'theme':
                   _toggleTheme();
                 case 'profile':
-                  WidgetsBinding.instance.addPostFrameCallback((_) async {
-                    if (!mounted) return;
-                    final changed = await Navigator.push<bool>(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            ProfileScreen(currentUser: _currentUser!),
-                      ),
-                    );
-                    if (changed == true && mounted) _loadCurrentUser();
-                  });
+                  _navigatorKey.currentState
+                      ?.push<bool>(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              ProfileScreen(currentUser: _currentUser!),
+                        ),
+                      )
+                      .then((changed) {
+                        if (changed == true && mounted) _loadCurrentUser();
+                      });
                 case 'logout':
                   _logout();
               }
@@ -276,6 +277,7 @@ class _LimpyAppState extends State<LimpyApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: _navigatorKey,
       title: 'Limpy',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
