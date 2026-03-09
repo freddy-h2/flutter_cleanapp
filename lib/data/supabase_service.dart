@@ -241,11 +241,96 @@ class SupabaseService {
   }
 
   /// Inserts a new comment for [scheduleId] with the given [message].
-  Future<void> sendComment(String scheduleId, String message) async {
-    await SupabaseConfig.client.from('comments').insert({
+  ///
+  /// If [senderId] is provided, the comment is attributed to that user.
+  /// If null, the comment is anonymous.
+  /// If [parentId] is provided, this comment is a reply to that comment.
+  Future<void> sendComment(
+    String scheduleId,
+    String message, {
+    String? senderId,
+    String? parentId,
+  }) async {
+    final data = <String, dynamic>{
       'schedule_id': scheduleId,
       'message': message,
-    });
+    };
+    if (senderId != null) data['sender_id'] = senderId;
+    if (parentId != null) data['parent_id'] = parentId;
+    await SupabaseConfig.client.from('comments').insert(data);
+  }
+
+  /// Returns all replies to the comment with [parentId], ordered by creation
+  /// time ascending (oldest first, for chat-like display).
+  Future<List<Comment>> getRepliesForComment(String parentId) async {
+    final data = await SupabaseConfig.client
+        .from('comments')
+        .select()
+        .eq('parent_id', parentId)
+        .order('created_at', ascending: true);
+    return data.map((json) => Comment.fromJson(json)).toList();
+  }
+
+  /// Returns all top-level comments for [scheduleId] with their replies.
+  ///
+  /// Returns a map where keys are top-level [Comment] objects and values are
+  /// lists of reply [Comment] objects (sorted by creation time ascending).
+  /// Top-level comments are sorted by creation time descending (newest first).
+  Future<Map<Comment, List<Comment>>> getCommentsWithReplies(
+    String scheduleId,
+  ) async {
+    // Fetch all comments for this schedule (top-level + replies)
+    final data = await SupabaseConfig.client
+        .from('comments')
+        .select()
+        .eq('schedule_id', scheduleId)
+        .order('created_at', ascending: true);
+    final allComments = data.map((json) => Comment.fromJson(json)).toList();
+
+    // Separate top-level comments from replies
+    final topLevel = allComments.where((c) => c.parentId == null).toList();
+    final replies = allComments.where((c) => c.parentId != null).toList();
+
+    // Build the map
+    final result = <Comment, List<Comment>>{};
+    for (final comment in topLevel.reversed) {
+      // reversed because we want newest first for top-level
+      result[comment] = replies.where((r) => r.parentId == comment.id).toList();
+    }
+    return result;
+  }
+
+  /// Returns all comments sent by [senderId] for [scheduleId], with their
+  /// replies, ordered by creation time descending.
+  Future<Map<Comment, List<Comment>>> getCommentsBySender(
+    String scheduleId,
+    String senderId,
+  ) async {
+    // Fetch comments sent by this user for this schedule
+    final sentData = await SupabaseConfig.client
+        .from('comments')
+        .select()
+        .eq('schedule_id', scheduleId)
+        .eq('sender_id', senderId)
+        .isFilter('parent_id', null)
+        .order('created_at', ascending: false);
+    final sentComments = sentData
+        .map((json) => Comment.fromJson(json))
+        .toList();
+
+    // Fetch all replies to those comments
+    final result = <Comment, List<Comment>>{};
+    for (final comment in sentComments) {
+      final repliesData = await SupabaseConfig.client
+          .from('comments')
+          .select()
+          .eq('parent_id', comment.id)
+          .order('created_at', ascending: true);
+      result[comment] = repliesData
+          .map((json) => Comment.fromJson(json))
+          .toList();
+    }
+    return result;
   }
 
   /// Deletes all comments linked to [scheduleId].
