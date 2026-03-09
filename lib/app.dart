@@ -402,27 +402,27 @@ class _LimpyAppState extends State<LimpyApp> {
                 BottomNavigationBarItem(
                   icon: Icon(CupertinoIcons.calendar),
                   activeIcon: Icon(CupertinoIcons.calendar_today),
-                  label: '',
+                  label: 'Calendario',
                 ),
                 BottomNavigationBarItem(
                   icon: Icon(CupertinoIcons.checkmark_square),
                   activeIcon: Icon(CupertinoIcons.checkmark_square_fill),
-                  label: '',
+                  label: 'Actividades',
                 ),
                 BottomNavigationBarItem(
                   icon: Icon(CupertinoIcons.house),
                   activeIcon: Icon(CupertinoIcons.house_fill),
-                  label: '',
+                  label: 'Inicio',
                 ),
                 BottomNavigationBarItem(
                   icon: Icon(CupertinoIcons.chat_bubble_2),
                   activeIcon: Icon(CupertinoIcons.chat_bubble_2_fill),
-                  label: '',
+                  label: 'Comentarios',
                 ),
                 BottomNavigationBarItem(
                   icon: Icon(CupertinoIcons.gear),
                   activeIcon: Icon(CupertinoIcons.gear_solid),
-                  label: '',
+                  label: 'Configuración',
                 ),
               ],
             ),
