@@ -33,8 +33,8 @@ abstract final class AppTheme {
     ),
     cardTheme: const CardThemeData(
       elevation: 1,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.all(Radius.circular(16)),
+      shape: ContinuousRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(40)),
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(
@@ -108,8 +108,8 @@ abstract final class AppTheme {
     ),
     cardTheme: const CardThemeData(
       elevation: 1,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.all(Radius.circular(16)),
+      shape: ContinuousRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(40)),
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(

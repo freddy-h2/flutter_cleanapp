@@ -234,8 +234,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
         return Card(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           shape: isCurrentUser
-              ? RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+              ? ContinuousRectangleBorder(
+                  borderRadius: BorderRadius.circular(40),
                   side: BorderSide(color: colorScheme.primary, width: 4),
                 )
               : null,
@@ -410,7 +410,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
               margin: const EdgeInsets.all(1),
               decoration: BoxDecoration(
                 color: bgColor,
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.circular(20),
                 border: isToday
                     ? Border.all(color: colorScheme.primary, width: 2)
                     : null,
