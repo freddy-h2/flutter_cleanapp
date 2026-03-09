@@ -8,5 +8,5 @@ Future<void> main() async {
   await SupabaseConfig.initialize();
   await NotificationService.instance.initialize();
   await NotificationService.instance.requestPermissions();
-  runApp(const CleanApp());
+  runApp(const LimpyApp());
 }
