@@ -642,6 +642,14 @@ class SupabaseService {
         .eq('id', announcementId);
   }
 
+  /// Reactivates a previously deactivated announcement.
+  Future<void> activateAnnouncement(String announcementId) async {
+    await SupabaseConfig.client
+        .from('announcements')
+        .update({'is_active': true})
+        .eq('id', announcementId);
+  }
+
   /// Deletes an announcement (admin only).
   ///
   /// Should only be called on inactive announcements.

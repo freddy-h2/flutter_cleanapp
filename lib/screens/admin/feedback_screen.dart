@@ -86,6 +86,19 @@ class _FeedbackScreenState extends State<FeedbackScreen>
     }
   }
 
+  Future<void> _activateAnnouncement(String announcementId) async {
+    try {
+      await SupabaseService.instance.activateAnnouncement(announcementId);
+      await _loadData();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al activar comunicado: $e')),
+        );
+      }
+    }
+  }
+
   Future<void> _deleteAnnouncement(String announcementId) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -472,9 +485,10 @@ class _FeedbackScreenState extends State<FeedbackScreen>
                                       child: const Text('Desactivar'),
                                     )
                                   else
-                                    const Chip(
-                                      label: Text('Inactivo'),
-                                      visualDensity: VisualDensity.compact,
+                                    TextButton(
+                                      onPressed: () =>
+                                          _activateAnnouncement(item.id),
+                                      child: const Text('Activar'),
                                     ),
                                 ],
                               ),
