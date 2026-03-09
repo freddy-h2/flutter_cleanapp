@@ -17,6 +17,7 @@ import 'package:flutter_cleanapp/screens/comments_screen.dart';
 import 'package:flutter_cleanapp/screens/home_screen.dart';
 import 'package:flutter_cleanapp/screens/notifications_screen.dart';
 import 'package:flutter_cleanapp/screens/settings_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Root application widget that owns theme state and bottom navigation.
@@ -29,6 +30,7 @@ class LimpyApp extends StatefulWidget {
 }
 
 class _LimpyAppState extends State<LimpyApp> {
+  static const String _themePrefKey = 'theme_mode';
   AppThemeMode _themeMode = AppThemeMode.system;
   int _currentIndex = 2;
 
@@ -46,6 +48,7 @@ class _LimpyAppState extends State<LimpyApp> {
   @override
   void initState() {
     super.initState();
+    _loadThemePreference();
     _checkAuth();
     RealtimeService.instance.subscribe();
     _schedulesRealtimeSub = RealtimeService.instance.onSchedulesChanged.listen((
@@ -357,6 +360,25 @@ class _LimpyAppState extends State<LimpyApp> {
     ),
   ];
 
+  Future<void> _loadThemePreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedTheme = prefs.getString(_themePrefKey);
+    if (savedTheme != null && mounted) {
+      setState(() {
+        _themeMode = switch (savedTheme) {
+          'light' => AppThemeMode.light,
+          'dark' => AppThemeMode.dark,
+          _ => AppThemeMode.system,
+        };
+      });
+    }
+  }
+
+  Future<void> _saveThemePreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_themePrefKey, _themeMode.name);
+  }
+
   void _toggleTheme() {
     setState(() {
       _themeMode = switch (_themeMode) {
@@ -365,6 +387,7 @@ class _LimpyAppState extends State<LimpyApp> {
         AppThemeMode.dark => AppThemeMode.system,
       };
     });
+    _saveThemePreference();
   }
 
   ThemeMode get _resolvedThemeMode => switch (_themeMode) {
