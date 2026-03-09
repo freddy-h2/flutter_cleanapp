@@ -161,18 +161,22 @@ class _LimpyAppState extends State<LimpyApp> {
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert),
             tooltip: 'Menú',
-            onSelected: (value) async {
+            onSelected: (value) {
               switch (value) {
                 case 'theme':
                   _toggleTheme();
                 case 'profile':
-                  final changed = await Navigator.push<bool>(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ProfileScreen(currentUser: _currentUser!),
-                    ),
-                  );
-                  if (changed == true && mounted) _loadCurrentUser();
+                  WidgetsBinding.instance.addPostFrameCallback((_) async {
+                    if (!mounted) return;
+                    final changed = await Navigator.push<bool>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            ProfileScreen(currentUser: _currentUser!),
+                      ),
+                    );
+                    if (changed == true && mounted) _loadCurrentUser();
+                  });
                 case 'logout':
                   _logout();
               }
@@ -188,9 +192,9 @@ class _LimpyAppState extends State<LimpyApp> {
                   ],
                 ),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'profile',
-                child: Row(
+                child: const Row(
                   children: [
                     Icon(Icons.person),
                     SizedBox(width: 12),
