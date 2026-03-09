@@ -23,7 +23,8 @@ void main() {
       await tester.pumpAndSettle();
 
       // Tap "Regístrate" to switch to register mode
-      await tester.tap(find.text('Regístrate'));
+      await tester.ensureVisible(find.text('Regístrate'));
+      await tester.tap(find.text('Regístrate'), warnIfMissed: false);
       await tester.pumpAndSettle();
 
       // Register mode shows "Crear Cuenta" title
@@ -76,7 +77,8 @@ void main() {
       await tester.pumpAndSettle();
 
       // Switch to register mode
-      await tester.tap(find.text('Regístrate'));
+      await tester.ensureVisible(find.text('Regístrate'));
+      await tester.tap(find.text('Regístrate'), warnIfMissed: false);
       await tester.pumpAndSettle();
       expect(find.text('Crear Cuenta'), findsOneWidget);
 

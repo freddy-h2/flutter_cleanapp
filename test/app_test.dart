@@ -30,7 +30,8 @@ void main() {
       await tester.pumpAndSettle();
 
       // Tap the "Regístrate" TextButton to switch to register mode.
-      await tester.tap(find.text('Regístrate'));
+      await tester.ensureVisible(find.text('Regístrate'));
+      await tester.tap(find.text('Regístrate'), warnIfMissed: false);
       await tester.pumpAndSettle();
 
       expect(find.text('Crear Cuenta'), findsOneWidget);
@@ -43,7 +44,8 @@ void main() {
       await tester.pumpAndSettle();
 
       // Switch to register mode.
-      await tester.tap(find.text('Regístrate'));
+      await tester.ensureVisible(find.text('Regístrate'));
+      await tester.tap(find.text('Regístrate'), warnIfMissed: false);
       await tester.pumpAndSettle();
 
       // Register mode should show name and room fields.

@@ -76,6 +76,81 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
+  Future<void> _showForgotPasswordDialog() async {
+    final emailController = TextEditingController(
+      text: _emailController.text.trim(),
+    );
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Recuperar Contraseña'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Ingresa tu correo electrónico y te enviaremos un enlace '
+              'para restablecer tu contraseña.',
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: emailController,
+              decoration: const InputDecoration(
+                labelText: 'Correo electrónico',
+                prefixIcon: Icon(Icons.email),
+              ),
+              keyboardType: TextInputType.emailAddress,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Enviar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final email = emailController.text.trim();
+      if (email.isEmpty || !email.contains('@')) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Ingresa un correo electrónico válido'),
+            ),
+          );
+        }
+        emailController.dispose();
+        return;
+      }
+      try {
+        await SupabaseConfig.client.auth.resetPasswordForEmail(email);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Se ha enviado un correo para restablecer tu contraseña',
+              ),
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error: $e')));
+        }
+      }
+    }
+    emailController.dispose();
+  }
+
   Widget _buildEmailVerificationView(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
@@ -296,6 +371,17 @@ class _AuthScreenState extends State<AuthScreen> {
                             return null;
                           },
                         ),
+                        if (_isLogin) ...[
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: _isLoading
+                                  ? null
+                                  : _showForgotPasswordDialog,
+                              child: const Text('¿Olvidaste tu contraseña?'),
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 24),
 
                         // Submit button
