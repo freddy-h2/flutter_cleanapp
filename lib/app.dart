@@ -11,6 +11,7 @@ import 'package:flutter_cleanapp/screens/auth_screen.dart';
 import 'package:flutter_cleanapp/screens/calendar_screen.dart';
 import 'package:flutter_cleanapp/screens/comments_screen.dart';
 import 'package:flutter_cleanapp/screens/home_screen.dart';
+import 'package:flutter_cleanapp/screens/notifications_screen.dart';
 import 'package:flutter_cleanapp/screens/profile_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -236,6 +237,12 @@ class _LimpyAppState extends State<LimpyApp> {
               switch (value) {
                 case 'theme':
                   _toggleTheme();
+                case 'notifications':
+                  _navigatorKey.currentState?.push(
+                    MaterialPageRoute(
+                      builder: (_) => const NotificationsScreen(),
+                    ),
+                  );
                 case 'feedback':
                   _showFeedbackDialog();
                 case 'admin_feedback':
@@ -254,6 +261,16 @@ class _LimpyAppState extends State<LimpyApp> {
                     Icon(_themeModeIcon),
                     const SizedBox(width: 12),
                     const Text('Cambiar tema'),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'notifications',
+                child: const Row(
+                  children: [
+                    Icon(Icons.notifications_outlined),
+                    SizedBox(width: 12),
+                    Text('Notificaciones'),
                   ],
                 ),
               ),
