@@ -651,4 +651,23 @@ class SupabaseService {
         .delete()
         .eq('id', announcementId);
   }
+
+  /// Updates an existing announcement (admin only).
+  Future<void> updateAnnouncement({
+    required String announcementId,
+    required String title,
+    required String message,
+    required AnnouncementType type,
+    String? link,
+  }) async {
+    await SupabaseConfig.client
+        .from('announcements')
+        .update({
+          'title': title,
+          'message': message,
+          'type': type.name,
+          'link': link,
+        })
+        .eq('id', announcementId);
+  }
 }

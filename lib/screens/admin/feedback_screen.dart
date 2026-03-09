@@ -244,6 +244,126 @@ class _FeedbackScreenState extends State<FeedbackScreen>
     linkController.dispose();
   }
 
+  Future<void> _showEditAnnouncementDialog(Announcement announcement) async {
+    final titleController = TextEditingController(text: announcement.title);
+    final messageController = TextEditingController(text: announcement.message);
+    final linkController = TextEditingController(text: announcement.link ?? '');
+    AnnouncementType selectedType = announcement.type;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Editar Comunicado'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: titleController,
+                  maxLength: 100,
+                  decoration: const InputDecoration(
+                    labelText: 'Título',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: messageController,
+                  maxLines: 4,
+                  maxLength: 500,
+                  decoration: const InputDecoration(
+                    labelText: 'Mensaje',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text('Tipo:'),
+                const SizedBox(height: 8),
+                SegmentedButton<AnnouncementType>(
+                  segments: const [
+                    ButtonSegment(
+                      value: AnnouncementType.aviso,
+                      label: Text('Aviso'),
+                      icon: Icon(Icons.campaign_outlined),
+                    ),
+                    ButtonSegment(
+                      value: AnnouncementType.update,
+                      label: Text('Actualización'),
+                      icon: Icon(Icons.system_update_outlined),
+                    ),
+                  ],
+                  selected: {selectedType},
+                  onSelectionChanged: (selection) {
+                    setDialogState(() {
+                      selectedType = selection.first;
+                    });
+                  },
+                ),
+                if (selectedType == AnnouncementType.update) ...[
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: linkController,
+                    decoration: const InputDecoration(
+                      labelText: 'Enlace de descarga',
+                      hintText: 'https://...',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Guardar'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed == true &&
+        titleController.text.trim().isNotEmpty &&
+        messageController.text.trim().isNotEmpty) {
+      try {
+        await SupabaseService.instance.updateAnnouncement(
+          announcementId: announcement.id,
+          title: titleController.text.trim(),
+          message: messageController.text.trim(),
+          type: selectedType,
+          link:
+              selectedType == AnnouncementType.update &&
+                  linkController.text.trim().isNotEmpty
+              ? linkController.text.trim()
+              : null,
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Comunicado actualizado.')),
+          );
+        }
+        await _loadData();
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error al actualizar: $e')));
+        }
+      }
+    }
+
+    titleController.dispose();
+    messageController.dispose();
+    linkController.dispose();
+  }
+
   String _formatDate(DateTime dt) {
     return '${dt.day.toString().padLeft(2, '0')}/'
         '${dt.month.toString().padLeft(2, '0')}/'
@@ -325,34 +445,39 @@ class _FeedbackScreenState extends State<FeedbackScreen>
                                   ),
                                 ),
                               ),
-                              if (!item.isActive)
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.edit_outlined),
+                                    tooltip: 'Editar',
+                                    onPressed: () =>
+                                        _showEditAnnouncementDialog(item),
+                                  ),
+                                  IconButton(
+                                    icon: Icon(
+                                      Icons.delete_outline,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.error,
+                                    ),
+                                    tooltip: 'Eliminar',
+                                    onPressed: () =>
+                                        _deleteAnnouncement(item.id),
+                                  ),
+                                  if (item.isActive)
+                                    TextButton(
+                                      onPressed: () =>
+                                          _deactivateAnnouncement(item.id),
+                                      child: const Text('Desactivar'),
+                                    )
+                                  else
                                     const Chip(
                                       label: Text('Inactivo'),
                                       visualDensity: VisualDensity.compact,
                                     ),
-                                    const SizedBox(width: 4),
-                                    IconButton(
-                                      icon: Icon(
-                                        Icons.delete_outline,
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.error,
-                                      ),
-                                      tooltip: 'Eliminar',
-                                      onPressed: () =>
-                                          _deleteAnnouncement(item.id),
-                                    ),
-                                  ],
-                                )
-                              else
-                                TextButton(
-                                  onPressed: () =>
-                                      _deactivateAnnouncement(item.id),
-                                  child: const Text('Desactivar'),
-                                ),
+                                ],
+                              ),
                             ],
                           ),
                           const SizedBox(height: 4),
