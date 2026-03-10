@@ -11,6 +11,7 @@ import 'package:flutter_cleanapp/models/extension_request.dart';
 import 'package:flutter_cleanapp/models/user_model.dart';
 import 'package:flutter_cleanapp/screens/admin/extension_requests_screen.dart';
 import 'package:flutter_cleanapp/screens/admin/user_management_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// Home screen that shows the current user's cleaning status for the week.
@@ -33,6 +34,13 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  // ── SharedPreferences keys ────────────────────────────────────────────────
+  static const String _prefCleaningNotified = 'cleaning_notified_schedule_id';
+  static const String _prefKnownAnnouncementIds = 'known_announcement_ids';
+  static const String _prefNotifiedIncomingRequestId =
+      'notified_incoming_request_id';
+  static const String _prefLastCommentCount = 'last_comment_count';
+
   List<CleaningSchedule> _schedules = [];
   List<UserModel> _users = [];
   bool _isLoading = true;
@@ -46,6 +54,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// Guard flag to avoid scheduling notifications on every reload.
   bool _notificationsScheduled = false;
+
+  /// The schedule ID for which cleaning notifications were last scheduled.
+  /// Persisted in SharedPreferences so restarts don't re-fire notifications.
+  String? _notifiedCleaningScheduleId;
 
   /// Number of pending extension requests (admin only).
   int _pendingExtensionCount = 0;
@@ -87,7 +99,9 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _loadPersistedState().then((_) {
+      if (mounted) _loadData();
+    });
     _schedulesRealtimeSub = RealtimeService.instance.onSchedulesChanged.listen((
       _,
     ) {
@@ -123,6 +137,31 @@ class _HomeScreenState extends State<HomeScreen> {
     _commentsRealtimeSub.cancel();
     _announcementsRealtimeSub.cancel();
     super.dispose();
+  }
+
+  /// Loads persisted notification state from SharedPreferences so that
+  /// duplicate notifications are not fired after an app restart.
+  Future<void> _loadPersistedState() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final knownIds = prefs.getStringList(_prefKnownAnnouncementIds);
+    if (knownIds != null) {
+      _knownAnnouncementIds = knownIds.toSet();
+    }
+
+    _notifiedIncomingRequestId = prefs.getString(
+      _prefNotifiedIncomingRequestId,
+    );
+
+    _lastKnownCommentCount = prefs.getInt(_prefLastCommentCount) ?? 0;
+
+    // Check if we already scheduled cleaning notifications for the current
+    // schedule.
+    final notifiedScheduleId = prefs.getString(_prefCleaningNotified);
+    if (notifiedScheduleId != null) {
+      _notificationsScheduled = true;
+      _notifiedCleaningScheduleId = notifiedScheduleId;
+    }
   }
 
   Future<void> _loadData() async {
@@ -166,7 +205,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
       // Schedule cleaning countdown notifications when the user is responsible
       // and the cleaning period is not yet completed.
-      if (!_notificationsScheduled) {
+      if (!_notificationsScheduled ||
+          _notifiedCleaningScheduleId != currentPeriodSchedule?.id) {
         final currentUser = widget.currentUser;
         final isResponsible =
             currentPeriodSchedule != null &&
@@ -199,12 +239,21 @@ class _HomeScreenState extends State<HomeScreen> {
             periodEndDate: endDate,
           );
           _notificationsScheduled = true;
+          _notifiedCleaningScheduleId = currentPeriodSchedule.id;
+
+          // Persist cleaning schedule ID so restarts don't re-fire.
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString(
+            _prefCleaningNotified,
+            currentPeriodSchedule.id,
+          );
 
           // Initialize comment count to avoid false notifications on first load.
           try {
             final comments = await SupabaseService.instance
                 .getCommentsWithReplies(currentPeriodSchedule.id);
             _lastKnownCommentCount = comments.keys.length;
+            await prefs.setInt(_prefLastCommentCount, _lastKnownCommentCount);
           } catch (_) {}
         }
       }
@@ -275,6 +324,10 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
       _lastKnownCommentCount = topLevelCount;
+
+      // Persist updated comment count.
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_prefLastCommentCount, _lastKnownCommentCount);
     } catch (_) {
       // Non-fatal
     }
@@ -300,6 +353,13 @@ class _HomeScreenState extends State<HomeScreen> {
           _knownAnnouncementIds = announcements.map((a) => a.id).toSet();
           _announcements = announcements;
         });
+
+        // Persist known announcement IDs.
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setStringList(
+          _prefKnownAnnouncementIds,
+          _knownAnnouncementIds.toList(),
+        );
       }
     } catch (_) {
       // Non-fatal — leave _announcements as empty.
@@ -487,6 +547,10 @@ class _HomeScreenState extends State<HomeScreen> {
         NotificationService.instance.notifyProrrogaReceived(
           requesterName: requester?.name ?? 'Un vecino',
         );
+
+        // Persist so restarts don't re-fire the notification.
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_prefNotifiedIncomingRequestId, incoming.id);
       }
 
       if (mounted) {
