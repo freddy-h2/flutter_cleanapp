@@ -255,7 +255,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
       // Build the requester's period around the anchor (consecutive same-user
       // schedules).
-      final requesterPeriodIds = _findPeriodScheduleIds(anchor);
+      final requesterPeriodIds = _findPeriodScheduleIds(
+        anchor,
+        maxSize: SupabaseService.cleaningPeriodDays,
+      );
       if (requesterPeriodIds.contains(schedule.id)) return request;
 
       // For accepted requests, also check the next user's period.
@@ -273,18 +276,44 @@ class _CalendarScreenState extends State<CalendarScreen> {
   /// Returns the IDs of consecutive same-user schedules around [anchor].
   ///
   /// Walks backward and forward from the anchor in the sorted [_schedules]
-  /// list, stopping when the user changes or dates are not consecutive.
-  Set<String> _findPeriodScheduleIds(CleaningSchedule anchor) {
+  /// list, stopping when the user changes, dates are not consecutive, the
+  /// result reaches [maxSize], or the date falls outside the allowed range.
+  ///
+  /// [maxSize] defaults to [SupabaseService.cleaningPeriodDays] to prevent
+  /// over-collection when adjacent same-user periods have no gap (e.g. after
+  /// a prórroga swap).
+  Set<String> _findPeriodScheduleIds(
+    CleaningSchedule anchor, {
+    int? maxSize = SupabaseService.cleaningPeriodDays,
+  }) {
     final sorted = List<CleaningSchedule>.from(_schedules)
       ..sort((a, b) => a.date.compareTo(b.date));
     final idx = sorted.indexWhere((s) => s.id == anchor.id);
     if (idx == -1) return {anchor.id};
 
+    final anchorDate = DateTime(
+      anchor.date.year,
+      anchor.date.month,
+      anchor.date.day,
+    );
+
+    // Define the maximum date range for this period.
+    final maxDays = maxSize ?? 365; // fallback to large number if no cap
+    final earliestDate = anchorDate.subtract(Duration(days: maxDays - 1));
+    final latestDate = anchorDate.add(Duration(days: maxDays - 1));
+
     final ids = <String>{anchor.id};
 
     // Walk backward.
     for (var i = idx - 1; i >= 0; i--) {
+      if (ids.length >= maxDays) break;
       if (sorted[i].userId != anchor.userId) break;
+      final schedDate = DateTime(
+        sorted[i].date.year,
+        sorted[i].date.month,
+        sorted[i].date.day,
+      );
+      if (schedDate.isBefore(earliestDate)) break;
       final diff = sorted[i + 1].date.difference(sorted[i].date).inDays;
       if (diff > 1) break;
       ids.add(sorted[i].id);
@@ -292,7 +321,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
     // Walk forward.
     for (var i = idx + 1; i < sorted.length; i++) {
+      if (ids.length >= maxDays) break;
       if (sorted[i].userId != anchor.userId) break;
+      final schedDate = DateTime(
+        sorted[i].date.year,
+        sorted[i].date.month,
+        sorted[i].date.day,
+      );
+      if (schedDate.isAfter(latestDate)) break;
       final diff = sorted[i].date.difference(sorted[i - 1].date).inDays;
       if (diff > 1) break;
       ids.add(sorted[i].id);
