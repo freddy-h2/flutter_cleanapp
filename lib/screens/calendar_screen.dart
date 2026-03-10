@@ -823,44 +823,59 @@ class _CalendarScreenState extends State<CalendarScreen> {
         // Legend.
         if (_users.isNotEmpty)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 4,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 for (final user in _users)
-                  GestureDetector(
-                    onTap: widget.currentUser.isAdmin
-                        ? () => _showColorPicker(user)
-                        : null,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 12,
-                          height: 12,
-                          decoration: BoxDecoration(
-                            color: _getUserColor(
-                              user.id,
-                            ).withValues(alpha: 0.7),
-                            shape: BoxShape.circle,
-                          ),
+                  Card(
+                    margin: const EdgeInsets.only(bottom: 4),
+                    child: InkWell(
+                      onTap: widget.currentUser.isAdmin
+                          ? () => _showColorPicker(user)
+                          : null,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${user.name} (${user.room})',
-                          style: textTheme.labelSmall,
-                        ),
-                        if (widget.currentUser.isAdmin)
-                          Padding(
-                            padding: const EdgeInsets.only(left: 2),
-                            child: Icon(
-                              Icons.color_lens,
-                              size: 12,
-                              color: colorScheme.onSurfaceVariant,
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 16,
+                              height: 16,
+                              decoration: BoxDecoration(
+                                color: _getUserColor(
+                                  user.id,
+                                ).withValues(alpha: 0.7),
+                                shape: BoxShape.circle,
+                              ),
                             ),
-                          ),
-                      ],
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                user.name,
+                                style: textTheme.bodyMedium,
+                              ),
+                            ),
+                            Text(
+                              user.room,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            if (widget.currentUser.isAdmin) ...[
+                              const SizedBox(width: 4),
+                              Icon(
+                                Icons.color_lens,
+                                size: 16,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
                     ),
                   ),
               ],
@@ -998,12 +1013,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
             ),
           ),
           Expanded(
-            child: _isGridView
-                ? SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: _buildGridView(schedules, colorScheme, textTheme),
-                  )
-                : _buildListView(items, colorScheme, textTheme),
+            child: RefreshIndicator(
+              onRefresh: _loadSchedules,
+              child: _isGridView
+                  ? SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: _buildGridView(schedules, colorScheme, textTheme),
+                    )
+                  : _buildListView(items, colorScheme, textTheme),
+            ),
           ),
         ],
       );

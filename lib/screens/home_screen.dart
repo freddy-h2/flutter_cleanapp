@@ -998,86 +998,92 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (isResponsible) {
       // State A — user has cleaning duty this week.
-      return SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            for (final a in _announcements)
-              if (!_dismissedAnnouncementIds.contains(a.id)) ...[
-                _buildAnnouncementBanner(a),
-                const SizedBox(height: 8),
+      return RefreshIndicator(
+        onRefresh: _loadData,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              for (final a in _announcements)
+                if (!_dismissedAnnouncementIds.contains(a.id)) ...[
+                  _buildAnnouncementBanner(a),
+                  const SizedBox(height: 8),
+                ],
+              if (_incomingRequest != null) ...[
+                _buildExtensionBanner(),
+                const SizedBox(height: 16),
               ],
-            if (_incomingRequest != null) ...[
-              _buildExtensionBanner(),
+              Icon(
+                CupertinoIcons.exclamationmark_triangle,
+                size: 80,
+                color: colorScheme.error,
+              ),
               const SizedBox(height: 16),
-            ],
-            Icon(
-              CupertinoIcons.exclamationmark_triangle,
-              size: 80,
-              color: colorScheme.error,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              '¡Te toca hacer el aseo!',
-              style: textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Periodo de aseo: ${_formatDate(displayPeriodStart)} - ${_formatDate(displayPeriodEnd)}',
-              style: textTheme.bodyLarge,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            Card(
-              child: ListTile(
-                leading: const Icon(CupertinoIcons.person),
-                title: Text(currentUser.name),
-                subtitle: Text(currentUser.room),
-              ),
-            ),
-            if (currentUser.isAdmin) adminCard(),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              icon: const Icon(CupertinoIcons.checkmark_square),
-              label: const Text('Ir a Actividades'),
-              onPressed: widget.onNavigateToActivities,
-            ),
-            const SizedBox(height: 12),
-            if (_hasExistingRequest) ...[
-              OutlinedButton.icon(
-                icon: const Icon(CupertinoIcons.xmark),
-                label: const Text('Cancelar Prórroga'),
-                onPressed: _isRequestingExtension ? null : _cancelExtension,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: colorScheme.error,
-                ),
-              ),
-            ] else if (_hasExceededProrrogaLimit) ...[
-              OutlinedButton.icon(
-                icon: const Icon(CupertinoIcons.clock),
-                label: const Text('Pedir Prórroga'),
-                onPressed: null,
-              ),
-              const SizedBox(height: 4),
               Text(
-                'Has excedido las prórrogas permitidas en este periodo',
-                style: textTheme.bodySmall?.copyWith(color: colorScheme.error),
+                '¡Te toca hacer el aseo!',
+                style: textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
                 textAlign: TextAlign.center,
               ),
-            ] else ...[
-              OutlinedButton.icon(
-                icon: const Icon(CupertinoIcons.clock),
-                label: const Text('Pedir Prórroga'),
-                onPressed: _isRequestingExtension
-                    ? null
-                    : _confirmAndRequestExtension,
+              const SizedBox(height: 8),
+              Text(
+                'Periodo de aseo: ${_formatDate(displayPeriodStart)} - ${_formatDate(displayPeriodEnd)}',
+                style: textTheme.bodyLarge,
+                textAlign: TextAlign.center,
               ),
+              const SizedBox(height: 24),
+              Card(
+                child: ListTile(
+                  leading: const Icon(CupertinoIcons.person),
+                  title: Text(currentUser.name),
+                  subtitle: Text(currentUser.room),
+                ),
+              ),
+              if (currentUser.isAdmin) adminCard(),
+              const SizedBox(height: 24),
+              FilledButton.icon(
+                icon: const Icon(CupertinoIcons.checkmark_square),
+                label: const Text('Ir a Actividades'),
+                onPressed: widget.onNavigateToActivities,
+              ),
+              const SizedBox(height: 12),
+              if (_hasExistingRequest) ...[
+                OutlinedButton.icon(
+                  icon: const Icon(CupertinoIcons.xmark),
+                  label: const Text('Cancelar Prórroga'),
+                  onPressed: _isRequestingExtension ? null : _cancelExtension,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: colorScheme.error,
+                  ),
+                ),
+              ] else if (_hasExceededProrrogaLimit) ...[
+                OutlinedButton.icon(
+                  icon: const Icon(CupertinoIcons.clock),
+                  label: const Text('Pedir Prórroga'),
+                  onPressed: null,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Has excedido las prórrogas permitidas en este periodo',
+                  style: textTheme.bodySmall?.copyWith(
+                    color: colorScheme.error,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ] else ...[
+                OutlinedButton.icon(
+                  icon: const Icon(CupertinoIcons.clock),
+                  label: const Text('Pedir Prórroga'),
+                  onPressed: _isRequestingExtension
+                      ? null
+                      : _confirmAndRequestExtension,
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       );
     }
@@ -1096,49 +1102,53 @@ class _HomeScreenState extends State<HomeScreen> {
         ? _formatDate(nextSchedule.date)
         : '—';
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          for (final a in _announcements)
-            if (!_dismissedAnnouncementIds.contains(a.id)) ...[
-              _buildAnnouncementBanner(a),
-              const SizedBox(height: 8),
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            for (final a in _announcements)
+              if (!_dismissedAnnouncementIds.contains(a.id)) ...[
+                _buildAnnouncementBanner(a),
+                const SizedBox(height: 8),
+              ],
+            if (_incomingRequest != null) ...[
+              _buildExtensionBanner(),
+              const SizedBox(height: 16),
             ],
-          if (_incomingRequest != null) ...[
-            _buildExtensionBanner(),
+            Icon(
+              CupertinoIcons.checkmark_circle,
+              size: 80,
+              color: colorScheme.primary,
+            ),
             const SizedBox(height: 16),
+            Text(
+              '¡Estás libre esta semana!',
+              style: textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Tu próximo turno inicia el $nextDateText',
+              style: textTheme.bodyLarge,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            Card(
+              child: ListTile(
+                leading: const Icon(CupertinoIcons.person),
+                title: Text(currentUser.name),
+                subtitle: Text(currentUser.room),
+              ),
+            ),
+            if (currentUser.isAdmin) adminCard(),
           ],
-          Icon(
-            CupertinoIcons.checkmark_circle,
-            size: 80,
-            color: colorScheme.primary,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            '¡Estás libre esta semana!',
-            style: textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Tu próximo turno inicia el $nextDateText',
-            style: textTheme.bodyLarge,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          Card(
-            child: ListTile(
-              leading: const Icon(CupertinoIcons.person),
-              title: Text(currentUser.name),
-              subtitle: Text(currentUser.room),
-            ),
-          ),
-          if (currentUser.isAdmin) adminCard(),
-        ],
+        ),
       ),
     );
   }
