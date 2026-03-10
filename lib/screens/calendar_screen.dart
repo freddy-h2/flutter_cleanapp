@@ -507,28 +507,20 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   '${_formatDate(lastDate)}'
             : '${user.room} — Periodo del ${_formatDate(firstDate)}';
 
-        // Determine card color: own card > swapped card > default.
+        // Determine card color: own card gets primaryContainer, others default.
         final Color? cardColor;
         if (isCurrentUser) {
           cardColor = colorScheme.primaryContainer;
-        } else if (isSwapped) {
-          cardColor = colorScheme.secondaryContainer;
         } else {
           cardColor = null;
         }
 
-        // Determine card shape: own card gets a primary border, swapped
-        // cards get a secondary border.
+        // Determine card shape: own card gets a primary border, others default.
         final ShapeBorder? cardShape;
         if (isCurrentUser) {
           cardShape = ContinuousRectangleBorder(
             borderRadius: BorderRadius.circular(40),
             side: BorderSide(color: colorScheme.primary, width: 2),
-          );
-        } else if (isSwapped) {
-          cardShape = ContinuousRectangleBorder(
-            borderRadius: BorderRadius.circular(40),
-            side: BorderSide(color: colorScheme.secondary, width: 2),
           );
         } else {
           cardShape = null;
@@ -744,18 +736,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
               isSwapped =
                   request != null &&
                   request.status == ExtensionRequestStatus.accepted;
-              // Override background tint for swapped cells.
-              if (isSwapped) {
-                bgColor = colorScheme.secondaryContainer.withValues(alpha: 0.3);
-              }
             }
 
-            // Determine border: today > swapped > none.
+            // Determine border: today only.
             final Border? cellBorder;
             if (isToday) {
               cellBorder = Border.all(color: colorScheme.primary, width: 2);
-            } else if (isSwapped) {
-              cellBorder = Border.all(color: colorScheme.secondary, width: 1.5);
             } else {
               cellBorder = null;
             }
