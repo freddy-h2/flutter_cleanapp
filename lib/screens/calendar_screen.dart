@@ -7,6 +7,7 @@ import 'package:flutter_cleanapp/models/cleaning_schedule.dart';
 import 'package:flutter_cleanapp/models/extension_request.dart';
 import 'package:flutter_cleanapp/models/user_model.dart';
 import 'package:flutter_cleanapp/screens/admin/schedule_management_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Displays the upcoming cleaning schedule for all residents.
 class CalendarScreen extends StatefulWidget {
@@ -27,6 +28,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
   bool _isLoading = true;
   bool _isGridView = false;
   late DateTime _gridMonth;
+
+  /// Custom user colors for the calendar grid, keyed by user ID.
+  /// Persisted in SharedPreferences.
+  Map<String, Color> _userColors = {};
+
+  /// SharedPreferences key prefix for user colors.
+  static const String _colorPrefPrefix = 'user_color_';
 
   late final StreamSubscription<void> _schedulesRealtimeSub;
   late final StreamSubscription<void> _extensionsRealtimeSub;
@@ -61,6 +69,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     super.initState();
     final now = DateTime.now();
     _gridMonth = DateTime(now.year, now.month);
+    _loadUserColors();
     _loadSchedules();
     _schedulesRealtimeSub = RealtimeService.instance.onSchedulesChanged.listen((
       _,
@@ -112,6 +121,117 @@ class _CalendarScreenState extends State<CalendarScreen> {
           SnackBar(content: Text('Error al cargar calendario: $e')),
         );
       }
+    }
+  }
+
+  /// Loads persisted user colors from SharedPreferences.
+  Future<void> _loadUserColors() async {
+    final prefs = await SharedPreferences.getInstance();
+    final colors = <String, Color>{};
+    for (final key in prefs.getKeys()) {
+      if (key.startsWith(_colorPrefPrefix)) {
+        final userId = key.substring(_colorPrefPrefix.length);
+        final colorValue = prefs.getInt(key);
+        if (colorValue != null) {
+          colors[userId] = Color(colorValue);
+        }
+      }
+    }
+    if (mounted) {
+      setState(() => _userColors = colors);
+    }
+  }
+
+  /// Persists a user color to SharedPreferences.
+  Future<void> _saveUserColor(String userId, Color color) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('$_colorPrefPrefix$userId', color.toARGB32());
+    if (mounted) {
+      setState(() {
+        _userColors[userId] = color;
+      });
+    }
+  }
+
+  /// Returns the color assigned to [userId], falling back to a deterministic
+  /// color from [Colors.primaries] based on the user's index in [_users].
+  Color _getUserColor(String userId) {
+    if (_userColors.containsKey(userId)) {
+      return _userColors[userId]!;
+    }
+    final index = _users.indexWhere((u) => u.id == userId);
+    if (index == -1) return Colors.grey;
+    return Colors.primaries[index % Colors.primaries.length];
+  }
+
+  /// Preset material colors offered in the color picker.
+  static const List<Color> _presetColors = [
+    Colors.red,
+    Colors.pink,
+    Colors.purple,
+    Colors.deepPurple,
+    Colors.indigo,
+    Colors.blue,
+    Colors.lightBlue,
+    Colors.cyan,
+    Colors.teal,
+    Colors.green,
+    Colors.lightGreen,
+    Colors.lime,
+    Colors.yellow,
+    Colors.amber,
+    Colors.orange,
+    Colors.deepOrange,
+    Colors.brown,
+    Colors.blueGrey,
+  ];
+
+  /// Shows a color picker dialog for the given [user] (admin only).
+  Future<void> _showColorPicker(UserModel user) async {
+    final currentColor = _getUserColor(user.id);
+    final picked = await showDialog<Color>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: Text('Color de ${user.name}'),
+          content: SizedBox(
+            width: 280,
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final color in _presetColors)
+                  GestureDetector(
+                    onTap: () => Navigator.pop(ctx, color),
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                        border: color.toARGB32() == currentColor.toARGB32()
+                            ? Border.all(
+                                color: Theme.of(ctx).colorScheme.onSurface,
+                                width: 3,
+                              )
+                            : null,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar'),
+            ),
+          ],
+        );
+      },
+    );
+    if (picked != null) {
+      await _saveUserColor(user.id, picked);
     }
   }
 
@@ -261,6 +381,15 @@ class _CalendarScreenState extends State<CalendarScreen> {
     return schedule.userId == widget.currentUser.id;
   }
 
+  /// Navigates to the schedule management screen and reloads on return.
+  Future<void> _navigateToScheduleManagement() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const ScheduleManagementScreen()),
+    );
+    await _loadSchedules();
+  }
+
   /// Returns a label describing the swap partner for an accepted [request].
   ///
   /// If [currentUserId] is the requester, they received the next user's dates,
@@ -316,6 +445,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
             .map(_getRequestForSchedule)
             .nonNulls
             .firstOrNull;
+        final isSwapped =
+            request != null &&
+            request.status == ExtensionRequestStatus.accepted;
 
         final subtitleText = period.schedules.length > 1
             ? '${user.room} — Periodo del '
@@ -323,15 +455,37 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   '${_formatDate(lastDate)}'
             : '${user.room} — Periodo del ${_formatDate(firstDate)}';
 
+        // Determine card color: own card > swapped card > default.
+        final Color? cardColor;
+        if (isCurrentUser) {
+          cardColor = colorScheme.primaryContainer;
+        } else if (isSwapped) {
+          cardColor = colorScheme.secondaryContainer;
+        } else {
+          cardColor = null;
+        }
+
+        // Determine card shape: own card gets a primary border, swapped
+        // cards get a secondary border.
+        final ShapeBorder? cardShape;
+        if (isCurrentUser) {
+          cardShape = ContinuousRectangleBorder(
+            borderRadius: BorderRadius.circular(40),
+            side: BorderSide(color: colorScheme.primary, width: 2),
+          );
+        } else if (isSwapped) {
+          cardShape = ContinuousRectangleBorder(
+            borderRadius: BorderRadius.circular(40),
+            side: BorderSide(color: colorScheme.secondary, width: 2),
+          );
+        } else {
+          cardShape = null;
+        }
+
         return Card(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          color: isCurrentUser ? colorScheme.primaryContainer : null,
-          shape: isCurrentUser
-              ? ContinuousRectangleBorder(
-                  borderRadius: BorderRadius.circular(40),
-                  side: BorderSide(color: colorScheme.primary, width: 2),
-                )
-              : null,
+          color: cardColor,
+          shape: cardShape,
           child: ListTile(
             leading: CircleAvatar(
               backgroundColor: isCurrentPeriod
@@ -406,10 +560,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
       scheduleMap[dateOnly] = s;
     }
 
-    // Build user color map.
+    // Build user color map using custom or default colors.
     final userColors = <String, Color>{};
-    for (var i = 0; i < _users.length; i++) {
-      userColors[_users[i].id] = Colors.primaries[i % Colors.primaries.length];
+    for (final user in _users) {
+      userColors[user.id] = _getUserColor(user.id);
     }
 
     // Calculate grid layout for _gridMonth.
@@ -498,6 +652,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
             Color? bgColor;
             String? initial;
             bool isCompleted = false;
+            bool isSwapped = false;
 
             if (schedule != null) {
               final baseColor = userColors[schedule.userId];
@@ -510,6 +665,21 @@ class _CalendarScreenState extends State<CalendarScreen> {
               );
               initial = user.name.isNotEmpty ? user.name[0] : '?';
               isCompleted = schedule.isCompleted;
+              // Check if this cell is part of an accepted swap.
+              final request = _getRequestForSchedule(schedule);
+              isSwapped =
+                  request != null &&
+                  request.status == ExtensionRequestStatus.accepted;
+            }
+
+            // Determine border: today > swapped > none.
+            final Border? cellBorder;
+            if (isToday) {
+              cellBorder = Border.all(color: colorScheme.primary, width: 2);
+            } else if (isSwapped) {
+              cellBorder = Border.all(color: colorScheme.secondary, width: 1.5);
+            } else {
+              cellBorder = null;
             }
 
             return Container(
@@ -517,9 +687,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
               decoration: BoxDecoration(
                 color: bgColor,
                 borderRadius: BorderRadius.circular(20),
-                border: isToday
-                    ? Border.all(color: colorScheme.primary, width: 2)
-                    : null,
+                border: cellBorder,
               ),
               child: Stack(
                 alignment: Alignment.center,
@@ -558,6 +726,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         color: colorScheme.primary,
                       ),
                     ),
+                  if (isSwapped)
+                    Positioned(
+                      bottom: 1,
+                      left: 1,
+                      child: Icon(
+                        Icons.swap_horiz,
+                        size: 10,
+                        color: colorScheme.secondary,
+                      ),
+                    ),
                 ],
               ),
             );
@@ -572,25 +750,40 @@ class _CalendarScreenState extends State<CalendarScreen> {
               spacing: 8,
               runSpacing: 4,
               children: [
-                for (var i = 0; i < _users.length; i++)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 12,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          color: Colors.primaries[i % Colors.primaries.length]
-                              .withValues(alpha: 0.7),
-                          shape: BoxShape.circle,
+                for (final user in _users)
+                  GestureDetector(
+                    onTap: widget.currentUser.isAdmin
+                        ? () => _showColorPicker(user)
+                        : null,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 12,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: _getUserColor(
+                              user.id,
+                            ).withValues(alpha: 0.7),
+                            shape: BoxShape.circle,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${_users[i].name} (${_users[i].room})',
-                        style: textTheme.labelSmall,
-                      ),
-                    ],
+                        const SizedBox(width: 4),
+                        Text(
+                          '${user.name} (${user.room})',
+                          style: textTheme.labelSmall,
+                        ),
+                        if (widget.currentUser.isAdmin)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 2),
+                            child: Icon(
+                              Icons.color_lens,
+                              size: 12,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
               ],
             ),
@@ -607,6 +800,30 @@ class _CalendarScreenState extends State<CalendarScreen> {
     Widget body;
     if (_isLoading) {
       body = const Center(child: CircularProgressIndicator());
+    } else if (_schedules.isEmpty) {
+      // Empty state — centered message with button for admin.
+      body = Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.calendar_month_outlined,
+              size: 64,
+              color: colorScheme.outline,
+            ),
+            const SizedBox(height: 16),
+            Text('No hay fechas en el calendario', style: textTheme.bodyLarge),
+            if (widget.currentUser.isAdmin) ...[
+              const SizedBox(height: 24),
+              OutlinedButton.icon(
+                onPressed: _navigateToScheduleManagement,
+                icon: const Icon(Icons.edit_calendar),
+                label: const Text('Gestionar Calendario'),
+              ),
+            ],
+          ],
+        ),
+      );
     } else {
       // Sort schedules by date ascending.
       final schedules = List<CleaningSchedule>.from(_schedules)
@@ -660,6 +877,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         ),
                       ),
                     ),
+                    if (widget.currentUser.isAdmin)
+                      IconButton(
+                        icon: const Icon(Icons.edit_calendar),
+                        tooltip: 'Gestionar calendario',
+                        onPressed: _navigateToScheduleManagement,
+                      ),
                     IconButton(
                       icon: Icon(
                         _isGridView
@@ -696,24 +919,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       );
     }
 
-    return Scaffold(
-      body: body,
-      floatingActionButton: widget.currentUser.isAdmin
-          ? FloatingActionButton(
-              onPressed: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const ScheduleManagementScreen(),
-                  ),
-                );
-                await _loadSchedules();
-              },
-              tooltip: 'Gestionar calendario',
-              child: const Icon(Icons.edit_calendar),
-            )
-          : null,
-    );
+    return Scaffold(body: body);
   }
 }
 
