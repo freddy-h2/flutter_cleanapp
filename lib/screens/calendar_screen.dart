@@ -85,7 +85,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   Future<void> _loadSchedules() async {
-    setState(() => _isLoading = true);
+    // Only show loading indicator on initial load, not on realtime refreshes.
+    if (_schedules.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     try {
       final schedules = await SupabaseService.instance.getSchedules();
       final users = await SupabaseService.instance.getUsers();
@@ -114,29 +117,118 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   /// Returns the extension request for [schedule], or null if none.
   ///
-  /// First tries an exact match by [CleaningSchedule.id]. If none is found,
-  /// also checks whether this schedule was the "other side" of an accepted
-  /// swap: after acceptance the next user's schedule has [requesterId] as its
-  /// [userId], so we match on that.
+  /// Only returns a request when [schedule] is part of one of the two
+  /// implicated periods (the requester's period or the next user's period).
+  ///
+  /// 1. Exact match by [CleaningSchedule.id] (the anchor schedule).
+  /// 2. Same-user consecutive schedules adjacent to the anchor (requester's
+  ///    period).
+  /// 3. For accepted requests, the next user's period: consecutive schedules
+  ///    of the same user immediately following the requester's period.
   ExtensionRequest? _getRequestForSchedule(CleaningSchedule schedule) {
-    // First try exact match by scheduleId (covers the original/requester schedule)
-    final exactMatch = _extensionRequests
-        .where((r) => r.scheduleId == schedule.id)
-        .firstOrNull;
-    if (exactMatch != null) return exactMatch;
+    for (final request in _extensionRequests) {
+      // Find the anchor schedule referenced by the request.
+      final anchor = _schedules
+          .where((s) => s.id == request.scheduleId)
+          .firstOrNull;
+      if (anchor == null) continue;
 
-    // For accepted requests, also check if this schedule was the 'other side'
-    // of a swap. After acceptance, the next user's schedule now has requesterId
-    // as its userId. So if schedule.userId == request.requesterId AND the
-    // request is accepted, this schedule was the one that received the
-    // requester in the swap.
-    return _extensionRequests
-        .where(
-          (r) =>
-              r.status == ExtensionRequestStatus.accepted &&
-              r.requesterId == schedule.userId,
-        )
-        .firstOrNull;
+      // Build the requester's period around the anchor (consecutive same-user
+      // schedules).
+      final requesterPeriodIds = _findPeriodScheduleIds(anchor);
+      if (requesterPeriodIds.contains(schedule.id)) return request;
+
+      // For accepted requests, also check the next user's period.
+      if (request.status == ExtensionRequestStatus.accepted) {
+        final nextUserPeriodIds = _findNextUserPeriodIds(
+          requesterPeriodIds,
+          request.nextUserId,
+        );
+        if (nextUserPeriodIds.contains(schedule.id)) return request;
+      }
+    }
+    return null;
+  }
+
+  /// Returns the IDs of consecutive same-user schedules around [anchor].
+  ///
+  /// Walks backward and forward from the anchor in the sorted [_schedules]
+  /// list, stopping when the user changes or dates are not consecutive.
+  Set<String> _findPeriodScheduleIds(CleaningSchedule anchor) {
+    final sorted = List<CleaningSchedule>.from(_schedules)
+      ..sort((a, b) => a.date.compareTo(b.date));
+    final idx = sorted.indexWhere((s) => s.id == anchor.id);
+    if (idx == -1) return {anchor.id};
+
+    final ids = <String>{anchor.id};
+
+    // Walk backward.
+    for (var i = idx - 1; i >= 0; i--) {
+      if (sorted[i].userId != anchor.userId) break;
+      final diff = sorted[i + 1].date.difference(sorted[i].date).inDays;
+      if (diff > 1) break;
+      ids.add(sorted[i].id);
+    }
+
+    // Walk forward.
+    for (var i = idx + 1; i < sorted.length; i++) {
+      if (sorted[i].userId != anchor.userId) break;
+      final diff = sorted[i].date.difference(sorted[i - 1].date).inDays;
+      if (diff > 1) break;
+      ids.add(sorted[i].id);
+    }
+
+    return ids;
+  }
+
+  /// Returns the IDs of the next user's period that immediately follows the
+  /// requester's period identified by [requesterPeriodIds].
+  Set<String> _findNextUserPeriodIds(
+    Set<String> requesterPeriodIds,
+    String nextUserId,
+  ) {
+    final sorted = List<CleaningSchedule>.from(_schedules)
+      ..sort((a, b) => a.date.compareTo(b.date));
+
+    // Find the last schedule in the requester's period.
+    DateTime? lastRequesterDate;
+    for (final s in sorted) {
+      if (requesterPeriodIds.contains(s.id)) {
+        final d = DateTime(s.date.year, s.date.month, s.date.day);
+        if (lastRequesterDate == null || d.isAfter(lastRequesterDate)) {
+          lastRequesterDate = d;
+        }
+      }
+    }
+    if (lastRequesterDate == null) return {};
+
+    // Find the first schedule after the requester's period end.
+    // After the swap, the next user's period now has requesterId as userId,
+    // so we match by position (immediately after) rather than by userId.
+    final ids = <String>{};
+    CleaningSchedule? periodAnchor;
+    for (final s in sorted) {
+      final d = DateTime(s.date.year, s.date.month, s.date.day);
+      if (d.isAfter(lastRequesterDate) && !requesterPeriodIds.contains(s.id)) {
+        periodAnchor = s;
+        break;
+      }
+    }
+    if (periodAnchor == null) return {};
+
+    // Collect the consecutive same-user period starting at periodAnchor.
+    final anchorIdx = sorted.indexWhere((s) => s.id == periodAnchor!.id);
+    if (anchorIdx == -1) return {};
+
+    ids.add(periodAnchor.id);
+    for (var i = anchorIdx + 1; i < sorted.length; i++) {
+      if (sorted[i].userId != periodAnchor.userId) break;
+      final diff = sorted[i].date.difference(sorted[i - 1].date).inDays;
+      if (diff > 1) break;
+      ids.add(sorted[i].id);
+    }
+
+    return ids;
   }
 
   /// Returns true if [schedule.date] falls within the current 3-day period.
@@ -233,10 +325,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
         return Card(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          color: isCurrentUser ? colorScheme.primaryContainer : null,
           shape: isCurrentUser
               ? ContinuousRectangleBorder(
                   borderRadius: BorderRadius.circular(40),
-                  side: BorderSide(color: colorScheme.primary, width: 4),
+                  side: BorderSide(color: colorScheme.primary, width: 2),
                 )
               : null,
           child: ListTile(
@@ -249,11 +342,24 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   : colorScheme.onSurfaceVariant,
               child: Text(user.name[0]),
             ),
-            title: Text(user.name),
+            title: Text(
+              user.name,
+              style: isCurrentUser
+                  ? TextStyle(
+                      color: colorScheme.onPrimaryContainer,
+                      fontWeight: FontWeight.bold,
+                    )
+                  : null,
+            ),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(subtitleText),
+                Text(
+                  subtitleText,
+                  style: isCurrentUser
+                      ? TextStyle(color: colorScheme.onPrimaryContainer)
+                      : null,
+                ),
                 if (request != null && request.isPending)
                   Chip(
                     label: const Text('Prórroga pendiente'),

@@ -5,6 +5,7 @@ import 'package:app_links/app_links.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_cleanapp/core/background_service.dart';
 import 'package:flutter_cleanapp/core/realtime_service.dart';
 import 'package:flutter_cleanapp/core/supabase_config.dart';
 import 'package:flutter_cleanapp/core/theme/app_theme.dart';
@@ -131,6 +132,11 @@ class _LimpyAppState extends State<LimpyApp> {
           _isLoadingUser = false;
         });
       }
+      // Start background notifications and persist user context.
+      if (user != null) {
+        await BackgroundService.instance.updateUserContext(userId: user.id);
+        await BackgroundService.instance.startPeriodicCheck();
+      }
     } catch (e) {
       debugPrint('Error loading user profile: $e');
       if (mounted) {
@@ -155,7 +161,12 @@ class _LimpyAppState extends State<LimpyApp> {
       );
       final periodEnd = today;
 
-      final schedules = await SupabaseService.instance.getSchedules();
+      // Fetch schedules and extensions in parallel for faster updates.
+      final schedulesFuture = SupabaseService.instance.getSchedules();
+      final extensionsFuture = SupabaseService.instance
+          .getExtensionRequestsForUser(_currentUser!.id);
+      final schedules = await schedulesFuture;
+      final extensions = await extensionsFuture;
 
       // Find schedules in the current 3-day period window.
       final currentPeriodSchedules = schedules.where((s) {
@@ -172,8 +183,6 @@ class _LimpyAppState extends State<LimpyApp> {
       bool isResponsible = schedule != null && !schedule.isCompleted;
 
       if (isResponsible) {
-        final extensions = await SupabaseService.instance
-            .getExtensionRequestsForUser(_currentUser!.id);
         final hasAcceptedProrroga = extensions.any(
           (e) =>
               e.status == ExtensionRequestStatus.accepted &&
@@ -184,12 +193,22 @@ class _LimpyAppState extends State<LimpyApp> {
       }
 
       if (mounted) setState(() => _isUserResponsible = isResponsible);
+
+      // Update background service with schedule context for comment checks.
+      if (_currentUser != null) {
+        await BackgroundService.instance.updateUserContext(
+          userId: _currentUser!.id,
+          scheduleId: isResponsible ? schedule?.id : null,
+        );
+      }
     } catch (_) {
       if (mounted) setState(() => _isUserResponsible = false);
     }
   }
 
   Future<void> _logout() async {
+    await BackgroundService.instance.stopPeriodicCheck();
+    await BackgroundService.instance.clearUserContext();
     await SupabaseConfig.client.auth.signOut();
   }
 

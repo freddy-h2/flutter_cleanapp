@@ -99,7 +99,10 @@ class _CommentsScreenState extends State<CommentsScreen> {
   }
 
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
+    // Only show loading indicator on initial load, not on realtime refreshes.
+    if (_currentWeekSchedule == null && _isLoading) {
+      setState(() => _isLoading = true);
+    }
     try {
       final schedule = await SupabaseService.instance
           .getCurrentPeriodSchedule();

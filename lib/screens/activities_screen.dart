@@ -65,6 +65,14 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
   }
 
   @override
+  void didUpdateWidget(ActivitiesScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isResponsible != widget.isResponsible) {
+      _loadTasks();
+    }
+  }
+
+  @override
   void dispose() {
     _tasksRealtimeSub.cancel();
     _schedulesRealtimeSub.cancel();
@@ -73,7 +81,10 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
   }
 
   Future<void> _loadTasks() async {
-    setState(() => _isLoading = true);
+    // Only show loading indicator on initial load, not on realtime refreshes.
+    if (_tasks.isEmpty && _isLoading) {
+      setState(() => _isLoading = true);
+    }
     try {
       if (!widget.isResponsible) {
         if (mounted) {

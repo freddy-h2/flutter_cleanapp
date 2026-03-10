@@ -165,7 +165,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
+    // Only show loading indicator on initial load, not on realtime refreshes.
+    if (_schedules.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     try {
       final results = await Future.wait([
         SupabaseService.instance.getSchedules(),
