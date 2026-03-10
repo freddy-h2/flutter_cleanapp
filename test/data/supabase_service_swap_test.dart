@@ -429,6 +429,97 @@ void main() {
     );
 
     test(
+      'full swap scenario with multiple cycles — only first cycle swapped',
+      () {
+        // 2 users, 4 cycles. User A requests prórroga, swapping with User B.
+        // Before swap:
+        //   Cycle 1: A(Mar1-3), B(Mar8-10)
+        //   Cycle 2: A(Mar15-17), B(Mar22-24)
+        final schedules = [
+          _schedule('a1', 'userA', DateTime(2026, 3, 1)),
+          _schedule('a2', 'userA', DateTime(2026, 3, 2)),
+          _schedule('a3', 'userA', DateTime(2026, 3, 3)),
+          _schedule('b1', 'userB', DateTime(2026, 3, 8)),
+          _schedule('b2', 'userB', DateTime(2026, 3, 9)),
+          _schedule('b3', 'userB', DateTime(2026, 3, 10)),
+          _schedule('a4', 'userA', DateTime(2026, 3, 15)),
+          _schedule('a5', 'userA', DateTime(2026, 3, 16)),
+          _schedule('a6', 'userA', DateTime(2026, 3, 17)),
+          _schedule('b4', 'userB', DateTime(2026, 3, 22)),
+          _schedule('b5', 'userB', DateTime(2026, 3, 23)),
+          _schedule('b6', 'userB', DateTime(2026, 3, 24)),
+        ];
+
+        // Simulate swap: anchor at a1, requester=userA, nextUser=userB
+        final requesterAnchor = schedules[0]; // a1
+        final requesterPeriod = findPeriodSchedules(
+          schedules,
+          requesterAnchor,
+          maxSize: 3,
+        );
+        expect(requesterPeriod.map((s) => s.id).toList(), ['a1', 'a2', 'a3']);
+
+        // Find next user's anchor
+        final periodEndDate = requesterPeriod.last.date;
+        CleaningSchedule? nextAnchor;
+        for (final s in schedules) {
+          if (s.userId == 'userB' && s.date.isAfter(periodEndDate)) {
+            nextAnchor = s;
+            break;
+          }
+        }
+        expect(nextAnchor, isNotNull);
+        expect(nextAnchor!.id, 'b1');
+
+        final nextUserPeriod = findPeriodSchedules(
+          schedules,
+          nextAnchor,
+          maxSize: 3,
+        );
+        expect(nextUserPeriod.map((s) => s.id).toList(), ['b1', 'b2', 'b3']);
+
+        // Simulate the swap: apply userId changes
+        final swapped = schedules.map((s) {
+          if (requesterPeriod.any((r) => r.id == s.id)) {
+            return s.copyWith(userId: 'userB');
+          }
+          if (nextUserPeriod.any((n) => n.id == s.id)) {
+            return s.copyWith(userId: 'userA');
+          }
+          return s;
+        }).toList();
+
+        // Verify post-swap state:
+        // a1-a3: now userB (swapped)
+        expect(swapped[0].userId, 'userB');
+        expect(swapped[1].userId, 'userB');
+        expect(swapped[2].userId, 'userB');
+        // b1-b3: now userA (swapped)
+        expect(swapped[3].userId, 'userA');
+        expect(swapped[4].userId, 'userA');
+        expect(swapped[5].userId, 'userA');
+        // a4-a6: still userA (untouched)
+        expect(swapped[6].userId, 'userA');
+        expect(swapped[7].userId, 'userA');
+        expect(swapped[8].userId, 'userA');
+        // b4-b6: still userB (untouched)
+        expect(swapped[9].userId, 'userB');
+        expect(swapped[10].userId, 'userB');
+        expect(swapped[11].userId, 'userB');
+
+        // Verify dates are unchanged
+        expect(swapped[0].date, DateTime(2026, 3, 1));
+        expect(swapped[3].date, DateTime(2026, 3, 8));
+        expect(swapped[6].date, DateTime(2026, 3, 15));
+        expect(swapped[9].date, DateTime(2026, 3, 22));
+
+        // Key insight: after swap, b1-b3 (userA) and a4-a6 (userA) are both
+        // userA but have a date gap (Mar10 → Mar15 = 5 days). The display
+        // layer must treat them as separate periods.
+      },
+    );
+
+    test(
       'swap with adjacent periods (no gap between users) — only involved periods swapped',
       () {
         // userA: March 1-3, userB: March 4-6 (no gap!)
