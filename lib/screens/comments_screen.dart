@@ -534,12 +534,15 @@ class _CommentsScreenState extends State<CommentsScreen> {
     // Reverse so that ListView(reverse: true) shows newest at bottom.
     final reversedItems = items.reversed.toList();
 
-    return ListView.builder(
-      controller: _senderScrollController,
-      reverse: true,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      itemCount: reversedItems.length,
-      itemBuilder: (_, index) => reversedItems[index],
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: ListView.builder(
+        controller: _senderScrollController,
+        reverse: true,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        itemCount: reversedItems.length,
+        itemBuilder: (_, index) => reversedItems[index],
+      ),
     );
   }
 
@@ -651,58 +654,63 @@ class _CommentsScreenState extends State<CommentsScreen> {
     final entries = _commentsWithReplies.entries.toList()
       ..sort((a, b) => b.key.createdAt.compareTo(a.key.createdAt));
 
-    return ListView.separated(
-      itemCount: entries.length,
-      separatorBuilder: (context, index) =>
-          const Divider(height: 1, indent: 72),
-      itemBuilder: (context, index) {
-        final comment = entries[index].key;
-        final replies = entries[index].value;
-        final replyCount = replies.length;
-        final preview = comment.message.length > 50
-            ? '${comment.message.substring(0, 50)}…'
-            : comment.message;
-        final replyLabel = replyCount == 0
-            ? 'Sin respuesta aún'
-            : '💬 $replyCount respuestas';
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: ListView.separated(
+        itemCount: entries.length,
+        separatorBuilder: (context, index) =>
+            const Divider(height: 1, indent: 72),
+        itemBuilder: (context, index) {
+          final comment = entries[index].key;
+          final replies = entries[index].value;
+          final replyCount = replies.length;
+          final preview = comment.message.length > 50
+              ? '${comment.message.substring(0, 50)}…'
+              : comment.message;
+          final replyLabel = replyCount == 0
+              ? 'Sin respuesta aún'
+              : '💬 $replyCount respuestas';
 
-        return Card(
-          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: Theme.of(
-                context,
-              ).colorScheme.surfaceContainerHighest,
-              child: const Icon(CupertinoIcons.person_crop_circle_badge_xmark),
-            ),
-            title: const Text('Comentario anónimo'),
-            subtitle: Text(
-              '$preview\n$replyLabel',
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            trailing: Text(
-              _formatTime(comment.createdAt),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-            isThreeLine: true,
-            onTap: () {
-              Navigator.of(context).push(
-                CupertinoPageRoute(
-                  builder: (_) => CommentChatScreen(
-                    parentComment: comment,
-                    initialReplies: replies,
-                    schedule: _currentWeekSchedule!,
-                    currentUser: widget.currentUser,
-                  ),
+          return Card(
+            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: ListTile(
+              leading: CircleAvatar(
+                backgroundColor: Theme.of(
+                  context,
+                ).colorScheme.surfaceContainerHighest,
+                child: const Icon(
+                  CupertinoIcons.person_crop_circle_badge_xmark,
                 ),
-              );
-            },
-          ),
-        );
-      },
+              ),
+              title: const Text('Comentario anónimo'),
+              subtitle: Text(
+                '$preview\n$replyLabel',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              trailing: Text(
+                _formatTime(comment.createdAt),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              isThreeLine: true,
+              onTap: () {
+                Navigator.of(context).push(
+                  CupertinoPageRoute(
+                    builder: (_) => CommentChatScreen(
+                      parentComment: comment,
+                      initialReplies: replies,
+                      schedule: _currentWeekSchedule!,
+                      currentUser: widget.currentUser,
+                    ),
+                  ),
+                );
+              },
+            ),
+          );
+        },
+      ),
     );
   }
 

@@ -264,34 +264,45 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
           ),
         ),
         Expanded(
-          child: ListView.builder(
-            itemCount: _tasks.length,
-            itemBuilder: (context, index) {
-              final task = _tasks[index];
-              return ListTile(
-                onTap: () => _toggleTask(index),
-                title: Text(
-                  task.title,
-                  style: TextStyle(
-                    decoration: task.isCompleted
-                        ? TextDecoration.lineThrough
-                        : null,
-                    color: task.isCompleted
-                        ? colorScheme.onSurfaceVariant
+          child: RefreshIndicator(
+            onRefresh: _loadTasks,
+            child: ListView.builder(
+              itemCount: _tasks.length,
+              itemBuilder: (context, index) {
+                final task = _tasks[index];
+                return Card(
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 4,
+                  ),
+                  child: ListTile(
+                    onTap: () => _toggleTask(index),
+                    leading: Icon(
+                      task.isCompleted
+                          ? Icons.check_circle
+                          : Icons.circle_outlined,
+                      color: task.isCompleted
+                          ? colorScheme.primary
+                          : colorScheme.outline,
+                    ),
+                    title: Text(
+                      task.title,
+                      style: TextStyle(
+                        decoration: task.isCompleted
+                            ? TextDecoration.lineThrough
+                            : null,
+                        color: task.isCompleted
+                            ? colorScheme.onSurfaceVariant
+                            : null,
+                      ),
+                    ),
+                    subtitle: task.description.isNotEmpty
+                        ? Text(task.description)
                         : null,
                   ),
-                ),
-                subtitle: task.description.isNotEmpty
-                    ? Text(task.description)
-                    : null,
-                trailing: Icon(
-                  task.isCompleted ? Icons.check_circle : Icons.circle_outlined,
-                  color: task.isCompleted
-                      ? colorScheme.primary
-                      : colorScheme.outline,
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
         ),
         SafeArea(
