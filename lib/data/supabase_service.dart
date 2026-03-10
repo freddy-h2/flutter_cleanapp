@@ -448,6 +448,9 @@ class SupabaseService {
   ///
   /// The search is bounded to [maxSize] days before and after the anchor
   /// date to prevent crossing into adjacent periods of the same user.
+  ///
+  /// Retained for use by tests and potential future callers.
+  // ignore: unused_element
   List<CleaningSchedule> _findPeriodSchedules(
     List<CleaningSchedule> sortedSchedules,
     CleaningSchedule anchor, {
@@ -512,84 +515,13 @@ class SupabaseService {
   /// Accepts the extension request identified by [requestId] and performs the
   /// schedule user-id swap between the requester and the next user.
   ///
-  /// Swaps the schedule rows in the requester's cleaning period with the
-  /// schedule rows in the next user's cleaning period. Only the two involved
-  /// periods are modified — other schedules are untouched.
+  /// Delegates all logic to the `accept_extension_swap` RPC function which
+  /// handles the swap atomically server-side with SECURITY DEFINER privileges.
   Future<void> acceptExtensionRequest(String requestId) async {
-    final now = DateTime.now().toIso8601String();
-
-    // Mark the request as accepted.
-    await SupabaseConfig.client
-        .from('extension_requests')
-        .update({'status': 'accepted', 'resolved_at': now})
-        .eq('id', requestId);
-
-    // Fetch the request to get the schedule and user ids.
-    final requestData = await SupabaseConfig.client
-        .from('extension_requests')
-        .select()
-        .eq('id', requestId)
-        .single();
-    final request = ExtensionRequest.fromJson(requestData);
-
-    // Fetch all schedules ordered by date.
-    final schedules = await getSchedules();
-
-    // Find the anchor schedule (the one referenced by the request).
-    final anchorIndex = schedules.indexWhere((s) => s.id == request.scheduleId);
-    if (anchorIndex == -1) return;
-    final anchor = schedules[anchorIndex];
-
-    // Find the requester's full period around the anchor (capped).
-    final requesterPeriod = _findPeriodSchedules(
-      schedules,
-      anchor,
-      maxSize: cleaningPeriodDays,
+    await SupabaseConfig.client.rpc(
+      'accept_extension_swap',
+      params: {'p_request_id': requestId},
     );
-    // Safety: verify all schedules in the period belong to the requester.
-    assert(
-      requesterPeriod.every((s) => s.userId == anchor.userId),
-      'Requester period contains schedules from other users',
-    );
-
-    // Find the next user's period — first consecutive group after requester's
-    // period end date.
-    final periodEndDate = requesterPeriod.last.date;
-    CleaningSchedule? nextAnchor;
-    for (final s in schedules) {
-      if (s.userId == request.nextUserId && s.date.isAfter(periodEndDate)) {
-        nextAnchor = s;
-        break;
-      }
-    }
-
-    // Swap requester's period: set all rows to nextUserId.
-    for (final s in requesterPeriod) {
-      await SupabaseConfig.client
-          .from('schedules')
-          .update({'user_id': request.nextUserId})
-          .eq('id', s.id);
-    }
-
-    // Swap next user's period: set all rows to requesterId.
-    if (nextAnchor != null) {
-      final nextUserPeriod = _findPeriodSchedules(
-        schedules,
-        nextAnchor,
-        maxSize: cleaningPeriodDays,
-      );
-      // Safety: verify all schedules in the period belong to the next user.
-      assert(
-        nextUserPeriod.every((s) => s.userId == request.nextUserId),
-        'Next user period contains schedules from other users',
-      );
-      for (final s in nextUserPeriod) {
-        await SupabaseConfig.client
-            .from('schedules')
-            .update({'user_id': request.requesterId})
-            .eq('id', s.id);
-      }
-    }
   }
 
   /// Rejects the extension request identified by [requestId].
