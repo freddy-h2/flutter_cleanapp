@@ -137,6 +137,29 @@ class SupabaseService {
     return CleaningSchedule.fromJson(data);
   }
 
+  /// Returns the first schedule in the current cleaning period (3-day window),
+  /// or null if no schedule exists for this period.
+  ///
+  /// The period window is [today - (cleaningPeriodDays - 1), today].
+  /// This matches the logic in app.dart _computeResponsibleStatus().
+  Future<CleaningSchedule?> getCurrentPeriodSchedule() async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final periodStart = today.subtract(
+      const Duration(days: cleaningPeriodDays - 1),
+    );
+    final data = await SupabaseConfig.client
+        .from('schedules')
+        .select()
+        .gte('date', periodStart.toIso8601String().split('T').first)
+        .lte('date', today.toIso8601String().split('T').first)
+        .order('date')
+        .limit(1)
+        .maybeSingle();
+    if (data == null) return null;
+    return CleaningSchedule.fromJson(data);
+  }
+
   /// Inserts a new cleaning schedule.
   Future<void> createSchedule(CleaningSchedule schedule) async {
     await SupabaseConfig.client.from('schedules').insert(schedule.toJson());
