@@ -92,17 +92,20 @@ class _ExtensionRequestsScreenState extends State<ExtensionRequestsScreen> {
     var startIdx = anchorIdx;
     var endIdx = anchorIdx;
 
-    // Walk backward
+    // Walk backward (capped to cleaningPeriodDays to prevent over-collection
+    // after a swap where adjacent same-user schedules may exist).
     while (startIdx > 0 &&
         sorted[startIdx - 1].userId == userId &&
         sorted[startIdx].date.difference(sorted[startIdx - 1].date).inDays <=
-            1) {
+            1 &&
+        (endIdx - startIdx + 1) < SupabaseService.cleaningPeriodDays) {
       startIdx--;
     }
-    // Walk forward
+    // Walk forward (same cap).
     while (endIdx < sorted.length - 1 &&
         sorted[endIdx + 1].userId == userId &&
-        sorted[endIdx + 1].date.difference(sorted[endIdx].date).inDays <= 1) {
+        sorted[endIdx + 1].date.difference(sorted[endIdx].date).inDays <= 1 &&
+        (endIdx - startIdx + 1) < SupabaseService.cleaningPeriodDays) {
       endIdx++;
     }
 
