@@ -376,9 +376,25 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final anchorIdx = sorted.indexWhere((s) => s.id == periodAnchor!.id);
     if (anchorIdx == -1) return {};
 
+    final anchorDate = DateTime(
+      periodAnchor.date.year,
+      periodAnchor.date.month,
+      periodAnchor.date.day,
+    );
+    final latestDate = anchorDate.add(
+      Duration(days: SupabaseService.cleaningPeriodDays - 1),
+    );
+
     ids.add(periodAnchor.id);
     for (var i = anchorIdx + 1; i < sorted.length; i++) {
+      if (ids.length >= SupabaseService.cleaningPeriodDays) break;
       if (sorted[i].userId != periodAnchor.userId) break;
+      final schedDate = DateTime(
+        sorted[i].date.year,
+        sorted[i].date.month,
+        sorted[i].date.day,
+      );
+      if (schedDate.isAfter(latestDate)) break;
       final diff = sorted[i].date.difference(sorted[i - 1].date).inDays;
       if (diff > 1) break;
       ids.add(sorted[i].id);
@@ -899,7 +915,19 @@ class _CalendarScreenState extends State<CalendarScreen> {
           orElse: () => const UserModel(id: '', name: '?', room: ''),
         );
         if (periods.isNotEmpty && periods.last.user.id == schedule.userId) {
-          periods.last.schedules.add(schedule);
+          final lastDate = periods.last.schedules.last.date;
+          final currentDate = schedule.date;
+          final daysDiff =
+              DateTime(currentDate.year, currentDate.month, currentDate.day)
+                  .difference(
+                    DateTime(lastDate.year, lastDate.month, lastDate.day),
+                  )
+                  .inDays;
+          if (daysDiff <= 1) {
+            periods.last.schedules.add(schedule);
+          } else {
+            periods.add(_PeriodEntry(schedules: [schedule], user: user));
+          }
         } else {
           periods.add(_PeriodEntry(schedules: [schedule], user: user));
         }

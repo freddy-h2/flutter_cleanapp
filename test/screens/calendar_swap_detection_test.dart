@@ -111,9 +111,26 @@ Set<String> findNextUserPeriodIds(
   final anchorIdx = sorted.indexWhere((s) => s.id == periodAnchor!.id);
   if (anchorIdx == -1) return {};
 
+  const cleaningPeriodDays = 3; // mirrors SupabaseService.cleaningPeriodDays
+  final anchorDate = DateTime(
+    periodAnchor.date.year,
+    periodAnchor.date.month,
+    periodAnchor.date.day,
+  );
+  final latestDate = anchorDate.add(
+    const Duration(days: cleaningPeriodDays - 1),
+  );
+
   ids.add(periodAnchor.id);
   for (var i = anchorIdx + 1; i < sorted.length; i++) {
+    if (ids.length >= cleaningPeriodDays) break;
     if (sorted[i].userId != periodAnchor.userId) break;
+    final schedDate = DateTime(
+      sorted[i].date.year,
+      sorted[i].date.month,
+      sorted[i].date.day,
+    );
+    if (schedDate.isAfter(latestDate)) break;
     final diff = sorted[i].date.difference(sorted[i - 1].date).inDays;
     if (diff > 1) break;
     ids.add(sorted[i].id);
@@ -296,6 +313,38 @@ void main() {
       expect(result.contains('b5'), isFalse);
       expect(result.contains('b6'), isFalse);
     });
+
+    test(
+      'post-swap with adjacent periods \u2014 maxSize prevents over-collection '
+      'into next same-user period',
+      () {
+        // After swap with adjacent periods (no gap):
+        // userB: Mar1-3 (swapped), userA: Mar4-6 (swapped), userA: Mar7-9
+        // (original)
+        final schedules = [
+          _schedule('a1', 'userB', DateTime(2026, 3, 1)),
+          _schedule('a2', 'userB', DateTime(2026, 3, 2)),
+          _schedule('a3', 'userB', DateTime(2026, 3, 3)),
+          _schedule('b1', 'userA', DateTime(2026, 3, 4)),
+          _schedule('b2', 'userA', DateTime(2026, 3, 5)),
+          _schedule('b3', 'userA', DateTime(2026, 3, 6)),
+          _schedule('a4', 'userA', DateTime(2026, 3, 7)),
+          _schedule('a5', 'userA', DateTime(2026, 3, 8)),
+          _schedule('a6', 'userA', DateTime(2026, 3, 9)),
+        ];
+
+        final requesterPeriodIds = {'a1', 'a2', 'a3'};
+        final result = findNextUserPeriodIds(
+          schedules,
+          requesterPeriodIds,
+          'userB',
+        );
+
+        // Should only collect b1, b2, b3 — NOT a4, a5, a6
+        expect(result, {'b1', 'b2', 'b3'});
+        expect(result.contains('a4'), isFalse);
+      },
+    );
 
     test(
       'no next period — requester period is the last, returns empty set',
