@@ -422,14 +422,14 @@ class SupabaseService {
     });
   }
 
-  /// Returns all consecutive schedules with the same [userId] around [anchor].
+  /// Finds the cleaning period schedules around [anchor].
   ///
-  /// [sortedSchedules] must be sorted by date ascending. Walks backward and
-  /// forward from [anchor] collecting schedules that belong to the same user
-  /// and are consecutive (date difference ≤ 1 day).
+  /// A period is defined as up to [maxSize] consecutive same-user schedules
+  /// where each date is at most 1 day apart from its neighbor. When [maxSize]
+  /// is provided, the result is capped to at most [maxSize] entries.
   ///
-  /// If [maxSize] is provided, the result is capped to at most [maxSize]
-  /// entries centered around the anchor.
+  /// The search is bounded to [maxSize] days before and after the anchor
+  /// date to prevent crossing into adjacent periods of the same user.
   List<CleaningSchedule> _findPeriodSchedules(
     List<CleaningSchedule> sortedSchedules,
     CleaningSchedule anchor, {
@@ -439,11 +439,29 @@ class SupabaseService {
     if (anchorIndex == -1) return [anchor];
 
     final userId = anchor.userId;
+    final anchorDate = DateTime(
+      anchor.date.year,
+      anchor.date.month,
+      anchor.date.day,
+    );
+
+    // Define the maximum date range for this period.
+    final maxDays = maxSize ?? 365; // fallback to large number if no cap
+    final earliestDate = anchorDate.subtract(Duration(days: maxDays - 1));
+    final latestDate = anchorDate.add(Duration(days: maxDays - 1));
+
     final result = <CleaningSchedule>[anchor];
 
     // Walk backward.
     for (var i = anchorIndex - 1; i >= 0; i--) {
       if (sortedSchedules[i].userId != userId) break;
+      final schedDate = DateTime(
+        sortedSchedules[i].date.year,
+        sortedSchedules[i].date.month,
+        sortedSchedules[i].date.day,
+      );
+      // Stop if date is outside the allowed range.
+      if (schedDate.isBefore(earliestDate)) break;
       final diff = sortedSchedules[i + 1].date
           .difference(sortedSchedules[i].date)
           .inDays;
@@ -456,6 +474,13 @@ class SupabaseService {
     for (var i = anchorIndex + 1; i < sortedSchedules.length; i++) {
       if (maxSize != null && result.length >= maxSize) break;
       if (sortedSchedules[i].userId != userId) break;
+      final schedDate = DateTime(
+        sortedSchedules[i].date.year,
+        sortedSchedules[i].date.month,
+        sortedSchedules[i].date.day,
+      );
+      // Stop if date is outside the allowed range.
+      if (schedDate.isAfter(latestDate)) break;
       final diff = sortedSchedules[i].date
           .difference(sortedSchedules[i - 1].date)
           .inDays;
@@ -469,10 +494,9 @@ class SupabaseService {
   /// Accepts the extension request identified by [requestId] and performs the
   /// schedule user-id swap between the requester and the next user.
   ///
-  /// Swaps ALL schedule rows in the requester's full cleaning period with ALL
-  /// schedule rows in the next user's full cleaning period. If the next user
-  /// has no period after the requester's, only the requester's period is
-  /// swapped.
+  /// Swaps the schedule rows in the requester's cleaning period with the
+  /// schedule rows in the next user's cleaning period. Only the two involved
+  /// periods are modified — other schedules are untouched.
   Future<void> acceptExtensionRequest(String requestId) async {
     final now = DateTime.now().toIso8601String();
 
@@ -504,6 +528,11 @@ class SupabaseService {
       anchor,
       maxSize: cleaningPeriodDays,
     );
+    // Safety: verify all schedules in the period belong to the requester.
+    assert(
+      requesterPeriod.every((s) => s.userId == anchor.userId),
+      'Requester period contains schedules from other users',
+    );
 
     // Find the next user's period — first consecutive group after requester's
     // period end date.
@@ -530,6 +559,11 @@ class SupabaseService {
         schedules,
         nextAnchor,
         maxSize: cleaningPeriodDays,
+      );
+      // Safety: verify all schedules in the period belong to the next user.
+      assert(
+        nextUserPeriod.every((s) => s.userId == request.nextUserId),
+        'Next user period contains schedules from other users',
       );
       for (final s in nextUserPeriod) {
         await SupabaseConfig.client

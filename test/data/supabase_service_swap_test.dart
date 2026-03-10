@@ -12,11 +12,29 @@ List<CleaningSchedule> findPeriodSchedules(
   if (anchorIndex == -1) return [anchor];
 
   final userId = anchor.userId;
+  final anchorDate = DateTime(
+    anchor.date.year,
+    anchor.date.month,
+    anchor.date.day,
+  );
+
+  // Define the maximum date range for this period.
+  final maxDays = maxSize ?? 365; // fallback to large number if no cap
+  final earliestDate = anchorDate.subtract(Duration(days: maxDays - 1));
+  final latestDate = anchorDate.add(Duration(days: maxDays - 1));
+
   final result = <CleaningSchedule>[anchor];
 
-  // Walk backward
+  // Walk backward.
   for (var i = anchorIndex - 1; i >= 0; i--) {
     if (sortedSchedules[i].userId != userId) break;
+    final schedDate = DateTime(
+      sortedSchedules[i].date.year,
+      sortedSchedules[i].date.month,
+      sortedSchedules[i].date.day,
+    );
+    // Stop if date is outside the allowed range.
+    if (schedDate.isBefore(earliestDate)) break;
     final diff = sortedSchedules[i + 1].date
         .difference(sortedSchedules[i].date)
         .inDays;
@@ -25,10 +43,17 @@ List<CleaningSchedule> findPeriodSchedules(
     if (maxSize != null && result.length >= maxSize) break;
   }
 
-  // Walk forward
+  // Walk forward.
   for (var i = anchorIndex + 1; i < sortedSchedules.length; i++) {
     if (maxSize != null && result.length >= maxSize) break;
     if (sortedSchedules[i].userId != userId) break;
+    final schedDate = DateTime(
+      sortedSchedules[i].date.year,
+      sortedSchedules[i].date.month,
+      sortedSchedules[i].date.day,
+    );
+    // Stop if date is outside the allowed range.
+    if (schedDate.isAfter(latestDate)) break;
     final diff = sortedSchedules[i].date
         .difference(sortedSchedules[i - 1].date)
         .inDays;
@@ -379,5 +404,84 @@ void main() {
       expect(swappedRequesterIds.length, 3);
       expect(swappedNextUserIds.length, 3);
     });
+
+    test(
+      'consecutive same-user schedules with no gap — maxSize prevents over-collection',
+      () {
+        // userA has 9 consecutive days (3 periods back-to-back with no gap).
+        final schedules = List.generate(
+          9,
+          (i) => _schedule('a${i + 1}', 'userA', DateTime(2026, 3, 1 + i)),
+        );
+
+        // Anchor at a1, maxSize=3 → should only get a1, a2, a3
+        final period = findPeriodSchedules(schedules, schedules[0], maxSize: 3);
+        expect(period.map((s) => s.id).toList(), ['a1', 'a2', 'a3']);
+
+        // Anchor at a5 (middle), maxSize=3 → should get a4, a5, a6
+        final period2 = findPeriodSchedules(
+          schedules,
+          schedules[4],
+          maxSize: 3,
+        );
+        expect(period2.length, 3);
+      },
+    );
+
+    test(
+      'swap with adjacent periods (no gap between users) — only involved periods swapped',
+      () {
+        // userA: March 1-3, userB: March 4-6 (no gap!)
+        // userA: March 7-9, userB: March 10-12
+        final schedules = [
+          _schedule('a1', 'userA', DateTime(2026, 3, 1)),
+          _schedule('a2', 'userA', DateTime(2026, 3, 2)),
+          _schedule('a3', 'userA', DateTime(2026, 3, 3)),
+          _schedule('b1', 'userB', DateTime(2026, 3, 4)),
+          _schedule('b2', 'userB', DateTime(2026, 3, 5)),
+          _schedule('b3', 'userB', DateTime(2026, 3, 6)),
+          _schedule('a4', 'userA', DateTime(2026, 3, 7)),
+          _schedule('a5', 'userA', DateTime(2026, 3, 8)),
+          _schedule('a6', 'userA', DateTime(2026, 3, 9)),
+          _schedule('b4', 'userB', DateTime(2026, 3, 10)),
+          _schedule('b5', 'userB', DateTime(2026, 3, 11)),
+          _schedule('b6', 'userB', DateTime(2026, 3, 12)),
+        ];
+
+        // Requester is userA, anchor at a1, maxSize=3
+        final requesterPeriod = findPeriodSchedules(
+          schedules,
+          schedules[0],
+          maxSize: 3,
+        );
+        expect(requesterPeriod.map((s) => s.id).toList(), ['a1', 'a2', 'a3']);
+
+        // Next user is userB, anchor at b1, maxSize=3
+        final nextUserPeriod = findPeriodSchedules(
+          schedules,
+          schedules[3],
+          maxSize: 3,
+        );
+        expect(nextUserPeriod.map((s) => s.id).toList(), ['b1', 'b2', 'b3']);
+
+        // Untouched schedules
+        expect(
+          requesterPeriod.map((s) => s.id).toSet().intersection({
+            'a4',
+            'a5',
+            'a6',
+          }),
+          isEmpty,
+        );
+        expect(
+          nextUserPeriod.map((s) => s.id).toSet().intersection({
+            'b4',
+            'b5',
+            'b6',
+          }),
+          isEmpty,
+        );
+      },
+    );
   });
 }
