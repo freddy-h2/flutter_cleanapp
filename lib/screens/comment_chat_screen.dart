@@ -118,6 +118,132 @@ class _CommentChatScreenState extends State<CommentChatScreen> {
     }
   }
 
+  /// Shows a bottom sheet with edit/delete actions for a comment.
+  void _showCommentActions(Comment comment) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(CupertinoIcons.pencil),
+              title: const Text('Editar'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showEditDialog(comment);
+              },
+            ),
+            ListTile(
+              leading: Icon(
+                CupertinoIcons.trash,
+                color: Theme.of(context).colorScheme.error,
+              ),
+              title: Text(
+                'Eliminar',
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+              onTap: () {
+                Navigator.pop(ctx);
+                _confirmDelete(comment);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Shows a dialog to edit a comment's message.
+  Future<void> _showEditDialog(Comment comment) async {
+    final controller = TextEditingController(text: comment.message);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Editar mensaje'),
+        content: TextField(
+          controller: controller,
+          maxLines: 3,
+          maxLength: 280,
+          autofocus: true,
+          decoration: const InputDecoration(
+            border: OutlineInputBorder(),
+            hintText: 'Escribe tu mensaje...',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && controller.text.trim().isNotEmpty) {
+      try {
+        await SupabaseService.instance.updateComment(
+          comment.id,
+          controller.text.trim(),
+        );
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error al editar: $e')));
+        }
+      }
+    }
+    controller.dispose();
+  }
+
+  /// Shows a confirmation dialog before deleting a comment.
+  Future<void> _confirmDelete(Comment comment) async {
+    final isTopLevel = comment.parentId == null;
+    final message = isTopLevel
+        ? 'Se eliminará este comentario y todas sus respuestas.'
+        : 'Se eliminará esta respuesta.';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Eliminar mensaje'),
+        content: Text('$message\n\n¿Continuar?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      try {
+        await SupabaseService.instance.deleteComment(comment.id);
+        // If a top-level comment was deleted, close this chat screen.
+        if (isTopLevel && mounted) {
+          Navigator.of(context).pop();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error al eliminar: $e')));
+        }
+      }
+    }
+  }
+
   /// Returns a relative-time string in Spanish for [dateTime].
   String _formatTime(DateTime dateTime) {
     final diff = DateTime.now().difference(dateTime);
@@ -136,12 +262,16 @@ class _CommentChatScreenState extends State<CommentChatScreen> {
   ///
   /// [isMe] = true → right-aligned with [ColorScheme.primaryContainer].
   /// [isMe] = false → left-aligned with [ColorScheme.surfaceContainerHighest].
+  ///
+  /// If [comment] is provided and belongs to the current user, a long-press
+  /// gesture enables edit/delete actions.
   Widget _buildChatBubble({
     required String message,
     required String time,
     required bool isMe,
     String? senderLabel,
     Color? bgColor,
+    Comment? comment,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
@@ -154,46 +284,53 @@ class _CommentChatScreenState extends State<CommentChatScreen> {
         ? colorScheme.onPrimaryContainer
         : colorScheme.onSecondaryContainer;
 
+    final canEdit =
+        comment != null && comment.senderId == widget.currentUser.id;
+
+    final bubble = Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: isMe
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
+        children: [
+          if (senderLabel != null) ...[
+            Text(
+              senderLabel,
+              style: textTheme.labelSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: onColor,
+              ),
+            ),
+            const SizedBox(height: 2),
+          ],
+          Text(message, style: textTheme.bodyMedium?.copyWith(color: onColor)),
+          const SizedBox(height: 4),
+          Text(
+            time,
+            style: textTheme.bodySmall?.copyWith(
+              color: onColor.withValues(alpha: 0.7),
+            ),
+          ),
+        ],
+      ),
+    );
+
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: screenWidth * 0.75),
-        child: Container(
-          margin: const EdgeInsets.symmetric(vertical: 4),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: backgroundColor,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Column(
-            crossAxisAlignment: isMe
-                ? CrossAxisAlignment.end
-                : CrossAxisAlignment.start,
-            children: [
-              if (senderLabel != null) ...[
-                Text(
-                  senderLabel,
-                  style: textTheme.labelSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: onColor,
-                  ),
-                ),
-                const SizedBox(height: 2),
-              ],
-              Text(
-                message,
-                style: textTheme.bodyMedium?.copyWith(color: onColor),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                time,
-                style: textTheme.bodySmall?.copyWith(
-                  color: onColor.withValues(alpha: 0.7),
-                ),
-              ),
-            ],
-          ),
-        ),
+        child: canEdit
+            ? GestureDetector(
+                onLongPress: () => _showCommentActions(comment),
+                child: bubble,
+              )
+            : bubble,
       ),
     );
   }
@@ -303,6 +440,7 @@ class _CommentChatScreenState extends State<CommentChatScreen> {
                   isMe: isMe,
                   senderLabel: isMe ? 'Tú' : 'Anónimo',
                   bgColor: isMe ? null : colorScheme.surfaceContainerHighest,
+                  comment: msg,
                 );
               },
             ),

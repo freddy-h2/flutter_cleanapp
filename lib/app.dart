@@ -31,7 +31,7 @@ class LimpyApp extends StatefulWidget {
   State<LimpyApp> createState() => _LimpyAppState();
 }
 
-class _LimpyAppState extends State<LimpyApp> {
+class _LimpyAppState extends State<LimpyApp> with WidgetsBindingObserver {
   static const String _themePrefKey = 'theme_mode';
   AppThemeMode _themeMode = AppThemeMode.system;
   int _currentIndex = 2;
@@ -50,6 +50,7 @@ class _LimpyAppState extends State<LimpyApp> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadThemePreference();
     _checkAuth();
     RealtimeService.instance.subscribe();
@@ -107,10 +108,28 @@ class _LimpyAppState extends State<LimpyApp> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _schedulesRealtimeSub.cancel();
     _extensionsRealtimeSub.cancel();
     RealtimeService.instance.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Re-subscribe to realtime channels — the WebSocket likely dropped
+      // while the app was paused/inactive/detached.
+      RealtimeService.instance.subscribe();
+      // Refresh responsible status and data so the UI is up-to-date.
+      if (_isAuthenticated && _currentUser != null) {
+        _computeResponsibleStatus();
+      }
+    } else if (state == AppLifecycleState.paused) {
+      // Optionally unsubscribe to save resources (the channel will be
+      // re-created on resume anyway).
+      RealtimeService.instance.unsubscribe();
+    }
   }
 
   Future<void> _checkAuth() async {

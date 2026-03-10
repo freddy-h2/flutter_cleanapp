@@ -358,6 +358,24 @@ class SupabaseService {
     return result;
   }
 
+  /// Updates the [message] of an existing comment identified by [commentId].
+  ///
+  /// The Supabase RLS policy only allows the comment's sender to update it.
+  Future<void> updateComment(String commentId, String message) async {
+    await SupabaseConfig.client
+        .from('comments')
+        .update({'message': message})
+        .eq('id', commentId);
+  }
+
+  /// Deletes a single comment identified by [commentId].
+  ///
+  /// The Supabase RLS policy only allows the comment's sender to delete it.
+  /// Replies are cascade-deleted by the database foreign key constraint.
+  Future<void> deleteComment(String commentId) async {
+    await SupabaseConfig.client.from('comments').delete().eq('id', commentId);
+  }
+
   /// Deletes all comments linked to [scheduleId].
   ///
   /// Called when a cleaning period is finalized to clean up ephemeral feedback.

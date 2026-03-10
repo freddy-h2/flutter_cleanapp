@@ -216,17 +216,143 @@ class _CommentsScreenState extends State<CommentsScreen> {
     }
   }
 
+  /// Shows a bottom sheet with edit/delete actions for a comment.
+  void _showCommentActions(Comment comment) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(CupertinoIcons.pencil),
+              title: const Text('Editar'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showEditDialog(comment);
+              },
+            ),
+            ListTile(
+              leading: Icon(
+                CupertinoIcons.trash,
+                color: Theme.of(context).colorScheme.error,
+              ),
+              title: Text(
+                'Eliminar',
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+              onTap: () {
+                Navigator.pop(ctx);
+                _confirmDelete(comment);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Shows a dialog to edit a comment's message.
+  Future<void> _showEditDialog(Comment comment) async {
+    final controller = TextEditingController(text: comment.message);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Editar comentario'),
+        content: TextField(
+          controller: controller,
+          maxLines: 3,
+          maxLength: 280,
+          autofocus: true,
+          decoration: const InputDecoration(
+            border: OutlineInputBorder(),
+            hintText: 'Escribe tu mensaje...',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && controller.text.trim().isNotEmpty) {
+      try {
+        await SupabaseService.instance.updateComment(
+          comment.id,
+          controller.text.trim(),
+        );
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error al editar: $e')));
+        }
+      }
+    }
+    controller.dispose();
+  }
+
+  /// Shows a confirmation dialog before deleting a comment.
+  Future<void> _confirmDelete(Comment comment) async {
+    final isTopLevel = comment.parentId == null;
+    final message = isTopLevel
+        ? 'Se eliminará este comentario y todas sus respuestas.'
+        : 'Se eliminará esta respuesta.';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Eliminar comentario'),
+        content: Text('$message\n\n¿Continuar?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      try {
+        await SupabaseService.instance.deleteComment(comment.id);
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error al eliminar: $e')));
+        }
+      }
+    }
+  }
+
   /// Builds a chat bubble widget.
   ///
   /// [isMe] = true → right-aligned with [ColorScheme.primaryContainer].
   /// [isMe] = false → left-aligned with [secondaryContainer] (sender view)
   /// or [surfaceContainerHighest] (inbox view, controlled by [bgColor]).
+  ///
+  /// If [comment] is provided and belongs to the current user, a long-press
+  /// gesture enables edit/delete actions.
   Widget _buildChatBubble({
     required String message,
     required String time,
     required bool isMe,
     String? senderLabel,
     Color? bgColor,
+    Comment? comment,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
@@ -241,46 +367,53 @@ class _CommentsScreenState extends State<CommentsScreen> {
         ? colorScheme.onPrimaryContainer
         : colorScheme.onSecondaryContainer;
 
+    final canEdit =
+        comment != null && comment.senderId == widget.currentUser.id;
+
+    final bubble = Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: isMe
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
+        children: [
+          if (senderLabel != null) ...[
+            Text(
+              senderLabel,
+              style: textTheme.labelSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: onColor,
+              ),
+            ),
+            const SizedBox(height: 2),
+          ],
+          Text(message, style: textTheme.bodyMedium?.copyWith(color: onColor)),
+          const SizedBox(height: 4),
+          Text(
+            time,
+            style: textTheme.bodySmall?.copyWith(
+              color: onColor.withValues(alpha: 0.7),
+            ),
+          ),
+        ],
+      ),
+    );
+
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: screenWidth * 0.75),
-        child: Container(
-          margin: const EdgeInsets.symmetric(vertical: 4),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: backgroundColor,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Column(
-            crossAxisAlignment: isMe
-                ? CrossAxisAlignment.end
-                : CrossAxisAlignment.start,
-            children: [
-              if (senderLabel != null) ...[
-                Text(
-                  senderLabel,
-                  style: textTheme.labelSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: onColor,
-                  ),
-                ),
-                const SizedBox(height: 2),
-              ],
-              Text(
-                message,
-                style: textTheme.bodyMedium?.copyWith(color: onColor),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                time,
-                style: textTheme.bodySmall?.copyWith(
-                  color: onColor.withValues(alpha: 0.7),
-                ),
-              ),
-            ],
-          ),
-        ),
+        child: canEdit
+            ? GestureDetector(
+                onLongPress: () => _showCommentActions(comment),
+                child: bubble,
+              )
+            : bubble,
       ),
     );
   }
@@ -381,6 +514,7 @@ class _CommentsScreenState extends State<CommentsScreen> {
           message: comment.message,
           time: _formatTime(comment.createdAt),
           isMe: true,
+          comment: comment,
         ),
       );
       for (final reply in replies) {
@@ -390,6 +524,7 @@ class _CommentsScreenState extends State<CommentsScreen> {
             time: _formatTime(reply.createdAt),
             isMe: false,
             senderLabel: _responsible?.name ?? 'Responsable',
+            comment: reply,
           ),
         );
       }

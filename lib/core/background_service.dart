@@ -38,7 +38,10 @@ void callbackDispatcher() {
 /// Performs the actual background data check and fires notifications.
 Future<void> _performBackgroundCheck() async {
   // Initialize services needed in the background isolate.
-  await SupabaseConfig.initialize();
+  // Use initializeForBackground() which reads cached credentials from
+  // SharedPreferences instead of dotenv (asset bundle is unavailable here).
+  final initialized = await SupabaseConfig.initializeForBackground();
+  if (!initialized) return;
   await NotificationService.instance.initialize();
 
   final prefs = await SharedPreferences.getInstance();
