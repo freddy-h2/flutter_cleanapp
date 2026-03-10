@@ -167,3 +167,11 @@ $$;
 
 -- Grant execute to authenticated users.
 GRANT EXECUTE ON FUNCTION public.accept_extension_swap(UUID) TO authenticated;
+
+-- Allow requester to update their own extension requests (for cancellation).
+-- This enables the requester to cancel a pending request by setting status to 'rejected'.
+CREATE POLICY "Requester can update own extension requests"
+  ON public.extension_requests FOR UPDATE
+  TO authenticated
+  USING (requester_id = auth.uid())
+  WITH CHECK (requester_id = auth.uid());
