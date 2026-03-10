@@ -523,14 +523,36 @@ class _CalendarScreenState extends State<CalendarScreen> {
           color: cardColor,
           shape: cardShape,
           child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: isCurrentPeriod
-                  ? colorScheme.primary
-                  : colorScheme.surfaceContainerHighest,
-              foregroundColor: isCurrentPeriod
-                  ? colorScheme.onPrimary
-                  : colorScheme.onSurfaceVariant,
-              child: Text(user.name[0]),
+            leading: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                CircleAvatar(
+                  backgroundColor: isCurrentPeriod
+                      ? colorScheme.primary
+                      : colorScheme.surfaceContainerHighest,
+                  foregroundColor: isCurrentPeriod
+                      ? colorScheme.onPrimary
+                      : colorScheme.onSurfaceVariant,
+                  child: Text(user.name[0]),
+                ),
+                if (isSwapped)
+                  Positioned(
+                    bottom: -4,
+                    right: -4,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: colorScheme.secondaryContainer,
+                        shape: BoxShape.circle,
+                      ),
+                      padding: const EdgeInsets.all(2),
+                      child: Icon(
+                        Icons.swap_horiz,
+                        size: 12,
+                        color: colorScheme.onSecondaryContainer,
+                      ),
+                    ),
+                  ),
+              ],
             ),
             title: Text(
               user.name,
@@ -561,7 +583,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     request.status == ExtensionRequestStatus.accepted)
                   Chip(
                     label: Text(
-                      'Intercambiado ${_swapLabel(request, period.user.id)}',
+                      'Cambiado — ${_swapLabel(request, period.user.id)}',
                     ),
                     avatar: const Icon(Icons.swap_horiz, size: 16),
                     visualDensity: VisualDensity.compact,
@@ -706,6 +728,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
               isSwapped =
                   request != null &&
                   request.status == ExtensionRequestStatus.accepted;
+              // Override background tint for swapped cells.
+              if (isSwapped) {
+                bgColor = colorScheme.secondaryContainer.withValues(alpha: 0.3);
+              }
             }
 
             // Determine border: today > swapped > none.
