@@ -6,7 +6,6 @@ import 'package:flutter_cleanapp/core/realtime_service.dart';
 import 'package:flutter_cleanapp/data/supabase_service.dart';
 import 'package:flutter_cleanapp/models/cleaning_schedule.dart';
 import 'package:flutter_cleanapp/models/cleaning_task.dart';
-import 'package:flutter_cleanapp/models/extension_request.dart';
 import 'package:flutter_cleanapp/models/user_model.dart';
 import 'package:flutter_cleanapp/screens/admin/task_management_screen.dart';
 
@@ -76,8 +75,6 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
   Future<void> _loadTasks() async {
     setState(() => _isLoading = true);
     try {
-      // If the user is not responsible this week, skip all schedule/prórroga
-      // queries and immediately show the 'libre' state.
       if (!widget.isResponsible) {
         if (mounted) {
           setState(() {
@@ -90,56 +87,23 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
         return;
       }
 
-      final now = DateTime.now();
-      final currentMonday = now.subtract(Duration(days: now.weekday - 1));
-      final currentWeekStart = DateTime(
-        currentMonday.year,
-        currentMonday.month,
-        currentMonday.day,
-      );
-      final currentWeekEnd = currentWeekStart.add(const Duration(days: 7));
+      // User is responsible — find their current period schedule and load tasks.
+      final schedule = await SupabaseService.instance
+          .getCurrentPeriodSchedule();
 
-      final schedules = await SupabaseService.instance.getSchedules();
-      final schedule = schedules.where((s) {
-        return s.userId == widget.currentUser.id &&
-            !s.date.isBefore(currentWeekStart) &&
-            s.date.isBefore(currentWeekEnd);
-      }).firstOrNull;
-
-      if (schedule != null) {
-        // Check if the user has an accepted prórroga that swapped them out.
-        // This handles the race condition where the schedule row hasn't been
-        // updated yet but the extension request is already accepted.
-        final extensions = await SupabaseService.instance
-            .getExtensionRequestsForUser(widget.currentUser.id);
-        final hasAcceptedProrroga = extensions.any(
-          (e) =>
-              e.status == ExtensionRequestStatus.accepted &&
-              e.requesterId == widget.currentUser.id &&
-              e.scheduleId == schedule.id,
-        );
-
-        if (hasAcceptedProrroga) {
-          if (mounted) {
-            setState(() {
-              _currentSchedule = null;
-              _hasSchedule = false;
-              _tasks = [];
-              _isLoading = false;
-            });
-          }
-        } else {
-          final tasks = await SupabaseService.instance.getTasks();
-          if (mounted) {
-            setState(() {
-              _currentSchedule = schedule;
-              _hasSchedule = true;
-              _tasks = tasks;
-              _isLoading = false;
-            });
-          }
+      if (schedule != null && schedule.userId == widget.currentUser.id) {
+        final tasks = await SupabaseService.instance.getTasks();
+        if (mounted) {
+          setState(() {
+            _currentSchedule = schedule;
+            _hasSchedule = true;
+            _tasks = tasks;
+            _isLoading = false;
+          });
         }
       } else {
+        // Fallback: isResponsible is true but no matching schedule found.
+        // This should not happen, but handle gracefully.
         if (mounted) {
           setState(() {
             _currentSchedule = null;

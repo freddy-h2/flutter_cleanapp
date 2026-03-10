@@ -52,6 +52,7 @@ class _CommentsScreenState extends State<CommentsScreen> {
 
   late final StreamSubscription<void> _commentsRealtimeSub;
   late final StreamSubscription<void> _schedulesRealtimeSub;
+  late final StreamSubscription<void> _extensionsRealtimeSub;
 
   @override
   void initState() {
@@ -71,12 +72,19 @@ class _CommentsScreenState extends State<CommentsScreen> {
         _loadData();
       }
     });
+    _extensionsRealtimeSub = RealtimeService.instance.onExtensionsChanged
+        .listen((_) {
+          if (mounted) {
+            _loadData();
+          }
+        });
   }
 
   @override
   void dispose() {
     _commentsRealtimeSub.cancel();
     _schedulesRealtimeSub.cancel();
+    _extensionsRealtimeSub.cancel();
     _messageController.dispose();
     _senderScrollController.dispose();
     super.dispose();
@@ -93,7 +101,8 @@ class _CommentsScreenState extends State<CommentsScreen> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      final schedule = await SupabaseService.instance.getCurrentWeekSchedule();
+      final schedule = await SupabaseService.instance
+          .getCurrentPeriodSchedule();
       UserModel? responsible;
 
       if (schedule != null) {
