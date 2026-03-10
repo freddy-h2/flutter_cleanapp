@@ -1,4 +1,5 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/timezone.dart' as tz;
 
 /// Singleton service for managing local notifications.
 class NotificationService {
@@ -58,10 +59,9 @@ class NotificationService {
     await _plugin.show(id, title, body, details);
   }
 
-  /// Schedule a notification at a specific time.
+  /// Schedule a notification at a specific time using the platform scheduler.
   ///
-  /// Uses a delayed [Future] for simplicity. For exact scheduling,
-  /// use zonedSchedule in a future task.
+  /// Uses [zonedSchedule] for reliable delivery even when the app is killed.
   Future<void> scheduleAt({
     required int id,
     required String title,
@@ -70,7 +70,27 @@ class NotificationService {
   }) async {
     final delay = scheduledDate.difference(DateTime.now());
     if (delay.isNegative) return;
-    Future.delayed(delay, () => show(id: id, title: title, body: body));
+
+    final tzScheduledDate = tz.TZDateTime.from(scheduledDate, tz.local);
+
+    const androidDetails = AndroidNotificationDetails(
+      'limpy_scheduled',
+      'Limpy Recordatorios',
+      channelDescription: 'Recordatorios programados de Limpy',
+      importance: Importance.high,
+      priority: Priority.high,
+    );
+    const details = NotificationDetails(android: androidDetails);
+
+    await _plugin.zonedSchedule(
+      id,
+      title,
+      body,
+      tzScheduledDate,
+      details,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      matchDateTimeComponents: null,
+    );
   }
 
   /// Cancel a specific notification by [id].
@@ -194,20 +214,13 @@ class NotificationService {
 
       final remaining = periodEnd.difference(dayOnly).inDays + 1;
 
-      final isToday = dayOnly == today;
       final body = remaining == 1
           ? 'Te queda 1 dia disponible para hacer el aseo'
           : remaining == periodDays
           ? 'Tienes $remaining dias disponibles para hacer el aseo'
           : 'Te quedan $remaining dias disponibles para hacer el aseo';
 
-      if (isToday) {
-        await show(
-          id: _cleaningBaseId + i,
-          title: 'Limpy - Periodo de Aseo',
-          body: body,
-        );
-      } else {
+      if (day.isAfter(DateTime.now())) {
         await scheduleAt(
           id: _cleaningBaseId + i,
           title: 'Limpy - Periodo de Aseo',
@@ -215,6 +228,7 @@ class NotificationService {
           scheduledDate: day,
         );
       }
+      // If 8 AM today has already passed, skip — no immediate notification.
     }
   }
 }
