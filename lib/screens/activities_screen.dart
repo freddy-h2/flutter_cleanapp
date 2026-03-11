@@ -19,11 +19,15 @@ class ActivitiesScreen extends StatefulWidget {
   /// Computed centrally in app.dart and passed down to avoid redundant queries.
   final bool isResponsible;
 
+  /// Callback to refresh the responsible status from the parent.
+  final Future<void> Function()? onRefreshStatus;
+
   /// Creates an [ActivitiesScreen].
   const ActivitiesScreen({
     super.key,
     required this.currentUser,
     required this.isResponsible,
+    this.onRefreshStatus,
   });
 
   @override
@@ -134,6 +138,13 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
     }
   }
 
+  Future<void> _refreshAll() async {
+    if (widget.onRefreshStatus != null) {
+      await widget.onRefreshStatus!();
+    }
+    await _loadTasks();
+  }
+
   bool get _allCompleted =>
       _tasks.isNotEmpty && _tasks.every((t) => t.isCompleted);
 
@@ -203,26 +214,40 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
     final textTheme = Theme.of(context).textTheme;
 
     if (!_hasSchedule) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              CupertinoIcons.checkmark_circle,
-              size: 64,
-              color: colorScheme.outline,
-            ),
-            const SizedBox(height: 16),
-            Text('¡Estás libre esta semana!', style: textTheme.bodyLarge),
-            if (widget.currentUser.isAdmin) ...[
-              const SizedBox(height: 24),
-              OutlinedButton.icon(
-                onPressed: _navigateToTaskManagement,
-                icon: const Icon(Icons.edit),
-                label: const Text('Editar Actividades'),
+      return RefreshIndicator(
+        onRefresh: _refreshAll,
+        child: LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      CupertinoIcons.checkmark_circle,
+                      size: 64,
+                      color: colorScheme.outline,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      '¡Estás libre esta semana!',
+                      style: textTheme.bodyLarge,
+                    ),
+                    if (widget.currentUser.isAdmin) ...[
+                      const SizedBox(height: 24),
+                      OutlinedButton.icon(
+                        onPressed: _navigateToTaskManagement,
+                        icon: const Icon(Icons.edit),
+                        label: const Text('Editar Actividades'),
+                      ),
+                    ],
+                  ],
+                ),
               ),
-            ],
-          ],
+            ),
+          ),
         ),
       );
     }
@@ -265,7 +290,7 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
         ),
         Expanded(
           child: RefreshIndicator(
-            onRefresh: _loadTasks,
+            onRefresh: _refreshAll,
             child: ListView.builder(
               itemCount: _tasks.length,
               itemBuilder: (context, index) {

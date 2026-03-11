@@ -385,6 +385,7 @@ class _LimpyAppState extends State<LimpyApp> with WidgetsBindingObserver {
     ActivitiesScreen(
       currentUser: _currentUser!,
       isResponsible: _isUserResponsible,
+      onRefreshStatus: _computeResponsibleStatus,
     ),
     HomeScreen(
       currentUser: _currentUser!,
