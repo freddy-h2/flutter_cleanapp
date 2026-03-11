@@ -687,6 +687,16 @@ class SupabaseService {
         .eq('id', announcementId);
   }
 
+  // --- Maintenance ---
+
+  /// Deletes completed schedules older than 7 days.
+  ///
+  /// Returns the number of deleted schedules.
+  Future<int> cleanupOldSchedules() async {
+    final result = await SupabaseConfig.client.rpc('cleanup_old_schedules');
+    return (result as int?) ?? 0;
+  }
+
   /// Updates an existing announcement (admin only).
   Future<void> updateAnnouncement({
     required String announcementId,

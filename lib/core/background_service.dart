@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_cleanapp/core/notification_service.dart';
 import 'package:flutter_cleanapp/core/supabase_config.dart';
+import 'package:flutter_cleanapp/data/supabase_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
 
@@ -173,6 +174,13 @@ Future<void> _performBackgroundCheck() async {
       }
     }
     await prefs.setInt(_PrefKeys.lastKnownCommentCount, currentCount);
+  }
+
+  // Clean up old completed schedules
+  try {
+    await SupabaseService.instance.cleanupOldSchedules();
+  } catch (_) {
+    // Non-fatal — cleanup will retry on next periodic check
   }
 }
 

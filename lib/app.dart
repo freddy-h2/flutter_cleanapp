@@ -155,6 +155,8 @@ class _LimpyAppState extends State<LimpyApp> with WidgetsBindingObserver {
       if (user != null) {
         await BackgroundService.instance.updateUserContext(userId: user.id);
         await BackgroundService.instance.startPeriodicCheck();
+        // Run cleanup once on startup (non-fatal if it fails).
+        SupabaseService.instance.cleanupOldSchedules().catchError((_) => 0);
       }
     } catch (e) {
       debugPrint('Error loading user profile: $e');
