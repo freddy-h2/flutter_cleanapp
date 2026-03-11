@@ -45,63 +45,81 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
     final formKey = GlobalKey<FormState>();
     final titleController = TextEditingController();
     final descriptionController = TextEditingController();
+    final messenger = ScaffoldMessenger.of(context);
+    final taskCount = _tasks.length;
 
-    await showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Agregar actividad'),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: titleController,
-                decoration: const InputDecoration(
-                  labelText: 'Nombre de la actividad',
-                ),
-                validator: (value) => (value == null || value.trim().isEmpty)
-                    ? 'El nombre no puede estar vacío'
-                    : null,
-                autofocus: true,
-              ),
-              TextFormField(
-                controller: descriptionController,
-                decoration: const InputDecoration(
-                  labelText: 'Descripcion de la actividad',
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (context) => Scaffold(
+          appBar: AppBar(
+            leading: CloseButton(onPressed: () => Navigator.pop(context)),
+            title: const Text('Agregar actividad'),
+            actions: [
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: FilledButton(
+                  onPressed: () {
+                    if (!formKey.currentState!.validate()) return;
+                    final title = titleController.text.trim();
+                    final description = descriptionController.text.trim();
+                    Navigator.pop(context);
+                    SupabaseService.instance
+                        .createTask(
+                          title,
+                          taskCount + 1,
+                          description: description.isEmpty ? null : description,
+                        )
+                        .then((_) => _loadTasks())
+                        .catchError((Object e) {
+                          messenger.showSnackBar(
+                            SnackBar(
+                              content: Text('Error al agregar actividad: $e'),
+                            ),
+                          );
+                        });
+                  },
+                  child: const Text('Agregar'),
                 ),
               ),
             ],
           ),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Form(
+              key: formKey,
+              child: Column(
+                children: [
+                  TextFormField(
+                    controller: titleController,
+                    decoration: const InputDecoration(
+                      labelText: 'Nombre de la actividad',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) =>
+                        (value == null || value.trim().isEmpty)
+                        ? 'El nombre no puede estar vacío'
+                        : null,
+                    autofocus: true,
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: descriptionController,
+                    maxLines: 5,
+                    minLines: 3,
+                    textInputAction: TextInputAction.newline,
+                    decoration: const InputDecoration(
+                      labelText: 'Descripción de la actividad',
+                      alignLabelWithHint: true,
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (!formKey.currentState!.validate()) return;
-              final title = titleController.text.trim();
-              final description = descriptionController.text.trim();
-              final messenger = ScaffoldMessenger.of(this.context);
-              Navigator.pop(context);
-              SupabaseService.instance
-                  .createTask(
-                    title,
-                    _tasks.length + 1,
-                    description: description.isEmpty ? null : description,
-                  )
-                  .then((_) => _loadTasks())
-                  .catchError((Object e) {
-                    messenger.showSnackBar(
-                      SnackBar(content: Text('Error al agregar actividad: $e')),
-                    );
-                  });
-            },
-            child: const Text('Agregar'),
-          ),
-        ],
       ),
     );
   }
@@ -110,63 +128,80 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
     final formKey = GlobalKey<FormState>();
     final titleController = TextEditingController(text: task.title);
     final descriptionController = TextEditingController(text: task.description);
+    final messenger = ScaffoldMessenger.of(context);
 
-    await showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Editar actividad'),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: titleController,
-                decoration: const InputDecoration(
-                  labelText: 'Nombre de la actividad',
-                ),
-                validator: (value) => (value == null || value.trim().isEmpty)
-                    ? 'El nombre no puede estar vacío'
-                    : null,
-                autofocus: true,
-              ),
-              TextFormField(
-                controller: descriptionController,
-                decoration: const InputDecoration(
-                  labelText: 'Descripcion de la actividad',
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (context) => Scaffold(
+          appBar: AppBar(
+            leading: CloseButton(onPressed: () => Navigator.pop(context)),
+            title: const Text('Editar actividad'),
+            actions: [
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: FilledButton(
+                  onPressed: () {
+                    if (!formKey.currentState!.validate()) return;
+                    final newTitle = titleController.text.trim();
+                    final newDescription = descriptionController.text.trim();
+                    Navigator.pop(context);
+                    SupabaseService.instance
+                        .updateTask(
+                          task.id,
+                          title: newTitle,
+                          description: newDescription,
+                        )
+                        .then((_) => _loadTasks())
+                        .catchError((Object e) {
+                          messenger.showSnackBar(
+                            SnackBar(
+                              content: Text('Error al editar actividad: $e'),
+                            ),
+                          );
+                        });
+                  },
+                  child: const Text('Guardar'),
                 ),
               ),
             ],
           ),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Form(
+              key: formKey,
+              child: Column(
+                children: [
+                  TextFormField(
+                    controller: titleController,
+                    decoration: const InputDecoration(
+                      labelText: 'Nombre de la actividad',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) =>
+                        (value == null || value.trim().isEmpty)
+                        ? 'El nombre no puede estar vacío'
+                        : null,
+                    autofocus: true,
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: descriptionController,
+                    maxLines: 5,
+                    minLines: 3,
+                    textInputAction: TextInputAction.newline,
+                    decoration: const InputDecoration(
+                      labelText: 'Descripción de la actividad',
+                      alignLabelWithHint: true,
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (!formKey.currentState!.validate()) return;
-              final newTitle = titleController.text.trim();
-              final newDescription = descriptionController.text.trim();
-              final messenger = ScaffoldMessenger.of(this.context);
-              Navigator.pop(context);
-              SupabaseService.instance
-                  .updateTask(
-                    task.id,
-                    title: newTitle,
-                    description: newDescription,
-                  )
-                  .then((_) => _loadTasks())
-                  .catchError((Object e) {
-                    messenger.showSnackBar(
-                      SnackBar(content: Text('Error al editar actividad: $e')),
-                    );
-                  });
-            },
-            child: const Text('Guardar'),
-          ),
-        ],
       ),
     );
   }
