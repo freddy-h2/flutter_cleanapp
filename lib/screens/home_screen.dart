@@ -47,6 +47,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _hasExistingRequest = false;
   bool _isRequestingExtension = false;
   bool _hasExceededProrrogaLimit = false;
+  bool _hasAcceptedIncomingProrroga = false;
 
   /// ID of the user's own pending outgoing prórroga request, used for
   /// cancellation.
@@ -205,6 +206,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
       // Check per-cycle prórroga limit.
       await _checkProrrogaLimit();
+
+      // Check if user accepted an incoming prórroga (blocks requesting one).
+      await _checkAcceptedIncomingProrroga();
 
       // Schedule cleaning countdown notifications when the user is responsible
       // and the cleaning period is not yet completed.
@@ -490,6 +494,25 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// Checks if the current user has accepted an incoming prórroga, making them
+  /// the new responsible. If so, they cannot request their own prórroga.
+  Future<void> _checkAcceptedIncomingProrroga() async {
+    try {
+      final requests = await SupabaseService.instance
+          .getExtensionRequestsForUser(widget.currentUser.id);
+      final hasAccepted = requests.any(
+        (r) =>
+            r.status == ExtensionRequestStatus.accepted &&
+            r.nextUserId == widget.currentUser.id,
+      );
+      if (mounted) {
+        setState(() => _hasAcceptedIncomingProrroga = hasAccepted);
+      }
+    } catch (_) {
+      // Non-fatal
+    }
+  }
+
   /// Loads the incoming extension request (if any) where the current user is
   /// the next_user_id, and fetches the requester's user info.
   ///
@@ -681,8 +704,8 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  /// Shows a confirmation dialog with the next user's name, then creates the
-  /// extension request if the user confirms.
+  /// Shows a user selection dialog, then a confirmation dialog, then creates
+  /// the extension request if the user confirms.
   Future<void> _confirmAndRequestExtension() async {
     final currentUser = widget.currentUser;
     final now = DateTime.now();
@@ -1066,6 +1089,20 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: OutlinedButton.styleFrom(
                     foregroundColor: colorScheme.error,
                   ),
+                ),
+              ] else if (_hasAcceptedIncomingProrroga) ...[
+                OutlinedButton.icon(
+                  icon: const Icon(CupertinoIcons.clock),
+                  label: const Text('Pedir Prórroga'),
+                  onPressed: null,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'No puedes pedir prórroga porque aceptaste una este periodo',
+                  style: textTheme.bodySmall?.copyWith(
+                    color: colorScheme.error,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
               ] else if (_hasExceededProrrogaLimit) ...[
                 OutlinedButton.icon(
