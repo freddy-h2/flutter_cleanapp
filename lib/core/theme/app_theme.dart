@@ -137,9 +137,11 @@ abstract final class AppTheme {
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFF48484A)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFF0A84FF), width: 2),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
     ),
