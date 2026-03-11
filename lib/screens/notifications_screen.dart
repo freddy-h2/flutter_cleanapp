@@ -116,15 +116,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Chip(
-                  label: Text(switch (announcement.type) {
-                    AnnouncementType.aviso => 'Aviso',
-                    AnnouncementType.recordatorio => 'Recordatorio',
-                    AnnouncementType.update => 'Actualización',
-                  }),
-                  visualDensity: VisualDensity.compact,
-                ),
+                if (widget.isAdmin) ...[
+                  const SizedBox(width: 8),
+                  Chip(
+                    label: Text(switch (announcement.type) {
+                      AnnouncementType.aviso => 'Aviso',
+                      AnnouncementType.recordatorio => 'Recordatorio',
+                      AnnouncementType.update => 'Actualización',
+                    }),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ],
               ],
             ),
             const SizedBox(height: 8),
