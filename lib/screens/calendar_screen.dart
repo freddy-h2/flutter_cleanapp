@@ -7,7 +7,6 @@ import 'package:flutter_cleanapp/models/cleaning_schedule.dart';
 import 'package:flutter_cleanapp/models/extension_request.dart';
 import 'package:flutter_cleanapp/models/user_model.dart';
 import 'package:flutter_cleanapp/screens/admin/schedule_management_screen.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 /// Displays the upcoming cleaning schedule for all residents.
 class CalendarScreen extends StatefulWidget {
@@ -28,13 +27,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
   bool _isLoading = true;
   bool _isGridView = false;
   late DateTime _gridMonth;
-
-  /// Custom user colors for the calendar grid, keyed by user ID.
-  /// Persisted in SharedPreferences.
-  Map<String, Color> _userColors = {};
-
-  /// SharedPreferences key prefix for user colors.
-  static const String _colorPrefPrefix = 'user_color_';
 
   late final StreamSubscription<void> _schedulesRealtimeSub;
   late final StreamSubscription<void> _extensionsRealtimeSub;
@@ -69,7 +61,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
     super.initState();
     final now = DateTime.now();
     _gridMonth = DateTime(now.year, now.month);
-    _loadUserColors();
     _loadSchedules();
     _schedulesRealtimeSub = RealtimeService.instance.onSchedulesChanged.listen((
       _,
@@ -124,44 +115,20 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
   }
 
-  /// Loads persisted user colors from SharedPreferences.
-  Future<void> _loadUserColors() async {
-    final prefs = await SharedPreferences.getInstance();
-    final colors = <String, Color>{};
-    for (final key in prefs.getKeys()) {
-      if (key.startsWith(_colorPrefPrefix)) {
-        final userId = key.substring(_colorPrefPrefix.length);
-        final colorValue = prefs.getInt(key);
-        if (colorValue != null) {
-          colors[userId] = Color(colorValue);
-        }
-      }
-    }
-    if (mounted) {
-      setState(() => _userColors = colors);
-    }
-  }
-
-  /// Persists a user color to SharedPreferences.
-  Future<void> _saveUserColor(String userId, Color color) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('$_colorPrefPrefix$userId', color.toARGB32());
-    if (mounted) {
-      setState(() {
-        _userColors[userId] = color;
-      });
-    }
-  }
-
-  /// Returns the color assigned to [userId], falling back to a deterministic
-  /// color from [Colors.primaries] based on the user's index in [_users].
+  /// Returns the color assigned to [userId].
+  /// Prefers the user's stored colorValue from the database.
+  /// Falls back to a deterministic color from [_presetColors] based on user index.
   Color _getUserColor(String userId) {
-    if (_userColors.containsKey(userId)) {
-      return _userColors[userId]!;
+    final user = _users.firstWhere(
+      (u) => u.id == userId,
+      orElse: () => const UserModel(id: '', name: '', room: ''),
+    );
+    if (user.colorValue != null) {
+      return Color(user.colorValue!);
     }
     final index = _users.indexWhere((u) => u.id == userId);
     if (index == -1) return Colors.grey;
-    return Colors.primaries[index % Colors.primaries.length];
+    return _presetColors[index % _presetColors.length];
   }
 
   /// Preset material colors offered in the color picker.
@@ -231,7 +198,23 @@ class _CalendarScreenState extends State<CalendarScreen> {
       },
     );
     if (picked != null) {
-      await _saveUserColor(user.id, picked);
+      try {
+        await SupabaseService.instance.updateUserColor(
+          user.id,
+          picked.toARGB32(),
+        );
+        // Reload users to get updated color
+        final users = await SupabaseService.instance.getUsers();
+        if (mounted) {
+          setState(() => _users = users);
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error al guardar color: $e')));
+        }
+      }
     }
   }
 
