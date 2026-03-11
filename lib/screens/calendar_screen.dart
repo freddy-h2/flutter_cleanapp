@@ -848,7 +848,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   Card(
                     margin: const EdgeInsets.only(bottom: 4),
                     child: InkWell(
-                      onTap: widget.currentUser.isAdmin
+                      onTap:
+                          (widget.currentUser.isAdmin ||
+                              user.id == widget.currentUser.id)
                           ? () => _showColorPicker(user)
                           : null,
                       borderRadius: BorderRadius.circular(12),
@@ -882,7 +884,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                 color: colorScheme.onSurfaceVariant,
                               ),
                             ),
-                            if (widget.currentUser.isAdmin) ...[
+                            if (widget.currentUser.isAdmin ||
+                                user.id == widget.currentUser.id) ...[
                               const SizedBox(width: 4),
                               Icon(
                                 Icons.color_lens,
