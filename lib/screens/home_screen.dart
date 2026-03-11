@@ -40,6 +40,8 @@ class _HomeScreenState extends State<HomeScreen> {
   static const String _prefNotifiedIncomingRequestId =
       'notified_incoming_request_id';
   static const String _prefLastCommentCount = 'last_comment_count';
+  static const String _prefDismissedAnnouncementIds =
+      'dismissed_announcement_ids';
 
   List<CleaningSchedule> _schedules = [];
   List<UserModel> _users = [];
@@ -148,6 +150,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final knownIds = prefs.getStringList(_prefKnownAnnouncementIds);
     if (knownIds != null) {
       _knownAnnouncementIds = knownIds.toSet();
+    }
+
+    final dismissedIds = prefs.getStringList(_prefDismissedAnnouncementIds);
+    if (dismissedIds != null) {
+      _dismissedAnnouncementIds.addAll(dismissedIds);
     }
 
     _notifiedIncomingRequestId = prefs.getString(
@@ -428,10 +435,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 IconButton(
                   icon: const Icon(CupertinoIcons.xmark, size: 18),
-                  onPressed: () {
+                  onPressed: () async {
                     setState(() {
                       _dismissedAnnouncementIds.add(announcement.id);
                     });
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.setStringList(
+                      _prefDismissedAnnouncementIds,
+                      _dismissedAnnouncementIds.toList(),
+                    );
                   },
                   tooltip: 'Cerrar',
                 ),
