@@ -136,111 +136,27 @@ class _FeedbackScreenState extends State<FeedbackScreen>
   }
 
   Future<void> _showCreateAnnouncementDialog() async {
-    final titleController = TextEditingController();
-    final messageController = TextEditingController();
-    final linkController = TextEditingController();
-    AnnouncementType selectedType = AnnouncementType.aviso;
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('Nuevo Comunicado'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  controller: titleController,
-                  maxLength: 100,
-                  decoration: const InputDecoration(
-                    labelText: 'Título',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: messageController,
-                  maxLines: 4,
-                  maxLength: 500,
-                  decoration: const InputDecoration(
-                    labelText: 'Mensaje',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                const Text('Tipo:'),
-                const SizedBox(height: 8),
-                SegmentedButton<AnnouncementType>(
-                  segments: const [
-                    ButtonSegment(
-                      value: AnnouncementType.aviso,
-                      label: Text('Aviso'),
-                      icon: Icon(Icons.campaign_outlined),
-                    ),
-                    ButtonSegment(
-                      value: AnnouncementType.recordatorio,
-                      label: Text('Recordatorio'),
-                      icon: Icon(Icons.notifications_active_outlined),
-                    ),
-                    ButtonSegment(
-                      value: AnnouncementType.update,
-                      label: Text('Actualización'),
-                      icon: Icon(Icons.system_update_outlined),
-                    ),
-                  ],
-                  selected: {selectedType},
-                  onSelectionChanged: (selection) {
-                    setDialogState(() {
-                      selectedType = selection.first;
-                    });
-                  },
-                ),
-                if (selectedType == AnnouncementType.update) ...[
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: linkController,
-                    decoration: const InputDecoration(
-                      labelText: 'Enlace de descarga',
-                      hintText: 'https://...',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Publicar'),
-            ),
-          ],
+    final result = await Navigator.push<_AnnouncementFormResult>(
+      context,
+      MaterialPageRoute<_AnnouncementFormResult>(
+        fullscreenDialog: true,
+        builder: (_) => const _AnnouncementFormRoute(
+          title: 'Nuevo Comunicado',
+          actionLabel: 'Publicar',
         ),
       ),
     );
 
-    if (confirmed == true &&
-        titleController.text.trim().isNotEmpty &&
-        messageController.text.trim().isNotEmpty) {
+    if (result != null && mounted) {
       try {
         final userId = await SupabaseService.instance.getCurrentUser();
         if (userId == null) return;
         await SupabaseService.instance.createAnnouncement(
           senderId: userId.id,
-          title: titleController.text.trim(),
-          message: messageController.text.trim(),
-          type: selectedType,
-          link:
-              selectedType == AnnouncementType.update &&
-                  linkController.text.trim().isNotEmpty
-              ? linkController.text.trim()
-              : null,
+          title: result.title,
+          message: result.message,
+          type: result.type,
+          link: result.link,
         );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -256,116 +172,32 @@ class _FeedbackScreenState extends State<FeedbackScreen>
         }
       }
     }
-
-    titleController.dispose();
-    messageController.dispose();
-    linkController.dispose();
   }
 
   Future<void> _showEditAnnouncementDialog(Announcement announcement) async {
-    final titleController = TextEditingController(text: announcement.title);
-    final messageController = TextEditingController(text: announcement.message);
-    final linkController = TextEditingController(text: announcement.link ?? '');
-    AnnouncementType selectedType = announcement.type;
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('Editar Comunicado'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  controller: titleController,
-                  maxLength: 100,
-                  decoration: const InputDecoration(
-                    labelText: 'Título',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: messageController,
-                  maxLines: 4,
-                  maxLength: 500,
-                  decoration: const InputDecoration(
-                    labelText: 'Mensaje',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                const Text('Tipo:'),
-                const SizedBox(height: 8),
-                SegmentedButton<AnnouncementType>(
-                  segments: const [
-                    ButtonSegment(
-                      value: AnnouncementType.aviso,
-                      label: Text('Aviso'),
-                      icon: Icon(Icons.campaign_outlined),
-                    ),
-                    ButtonSegment(
-                      value: AnnouncementType.recordatorio,
-                      label: Text('Recordatorio'),
-                      icon: Icon(Icons.notifications_active_outlined),
-                    ),
-                    ButtonSegment(
-                      value: AnnouncementType.update,
-                      label: Text('Actualización'),
-                      icon: Icon(Icons.system_update_outlined),
-                    ),
-                  ],
-                  selected: {selectedType},
-                  onSelectionChanged: (selection) {
-                    setDialogState(() {
-                      selectedType = selection.first;
-                    });
-                  },
-                ),
-                if (selectedType == AnnouncementType.update) ...[
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: linkController,
-                    decoration: const InputDecoration(
-                      labelText: 'Enlace de descarga',
-                      hintText: 'https://...',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Guardar'),
-            ),
-          ],
+    final result = await Navigator.push<_AnnouncementFormResult>(
+      context,
+      MaterialPageRoute<_AnnouncementFormResult>(
+        fullscreenDialog: true,
+        builder: (_) => _AnnouncementFormRoute(
+          title: 'Editar Comunicado',
+          actionLabel: 'Guardar',
+          initialTitle: announcement.title,
+          initialMessage: announcement.message,
+          initialType: announcement.type,
+          initialLink: announcement.link,
         ),
       ),
     );
 
-    if (confirmed == true &&
-        titleController.text.trim().isNotEmpty &&
-        messageController.text.trim().isNotEmpty) {
+    if (result != null && mounted) {
       try {
         await SupabaseService.instance.updateAnnouncement(
           announcementId: announcement.id,
-          title: titleController.text.trim(),
-          message: messageController.text.trim(),
-          type: selectedType,
-          link:
-              selectedType == AnnouncementType.update &&
-                  linkController.text.trim().isNotEmpty
-              ? linkController.text.trim()
-              : null,
+          title: result.title,
+          message: result.message,
+          type: result.type,
+          link: result.link,
         );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -381,10 +213,6 @@ class _FeedbackScreenState extends State<FeedbackScreen>
         }
       }
     }
-
-    titleController.dispose();
-    messageController.dispose();
-    linkController.dispose();
   }
 
   String _formatDate(DateTime dt) {
@@ -582,6 +410,178 @@ class _FeedbackScreenState extends State<FeedbackScreen>
       body: TabBarView(
         controller: _tabController,
         children: [_buildFeedbackTab(), _buildAnnouncementsTab()],
+      ),
+    );
+  }
+}
+
+/// Result returned by [_AnnouncementFormRoute] when the user confirms.
+class _AnnouncementFormResult {
+  const _AnnouncementFormResult({
+    required this.title,
+    required this.message,
+    required this.type,
+    this.link,
+  });
+
+  final String title;
+  final String message;
+  final AnnouncementType type;
+  final String? link;
+}
+
+/// Full-screen form route for creating or editing an announcement.
+class _AnnouncementFormRoute extends StatefulWidget {
+  const _AnnouncementFormRoute({
+    required this.title,
+    required this.actionLabel,
+    this.initialTitle,
+    this.initialMessage,
+    this.initialType,
+    this.initialLink,
+  });
+
+  final String title;
+  final String actionLabel;
+  final String? initialTitle;
+  final String? initialMessage;
+  final AnnouncementType? initialType;
+  final String? initialLink;
+
+  @override
+  State<_AnnouncementFormRoute> createState() => _AnnouncementFormRouteState();
+}
+
+class _AnnouncementFormRouteState extends State<_AnnouncementFormRoute> {
+  late final TextEditingController _titleController;
+  late final TextEditingController _messageController;
+  late final TextEditingController _linkController;
+  late AnnouncementType _selectedType;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController(text: widget.initialTitle ?? '');
+    _messageController = TextEditingController(
+      text: widget.initialMessage ?? '',
+    );
+    _linkController = TextEditingController(text: widget.initialLink ?? '');
+    _selectedType = widget.initialType ?? AnnouncementType.aviso;
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _messageController.dispose();
+    _linkController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final title = _titleController.text.trim();
+    final message = _messageController.text.trim();
+    if (title.isEmpty || message.isEmpty) return;
+    final link =
+        _selectedType == AnnouncementType.update &&
+            _linkController.text.trim().isNotEmpty
+        ? _linkController.text.trim()
+        : null;
+    Navigator.pop(
+      context,
+      _AnnouncementFormResult(
+        title: title,
+        message: message,
+        type: _selectedType,
+        link: link,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.title),
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => Navigator.pop(context),
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: FilledButton(
+              onPressed: _submit,
+              child: Text(widget.actionLabel),
+            ),
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _titleController,
+              maxLength: 100,
+              decoration: const InputDecoration(
+                labelText: 'Título',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _messageController,
+              maxLines: 8,
+              minLines: 4,
+              maxLength: 500,
+              decoration: const InputDecoration(
+                labelText: 'Mensaje',
+                alignLabelWithHint: true,
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text('Tipo:'),
+            const SizedBox(height: 8),
+            SegmentedButton<AnnouncementType>(
+              segments: const [
+                ButtonSegment(
+                  value: AnnouncementType.aviso,
+                  label: Text('Aviso'),
+                  icon: Icon(Icons.campaign_outlined),
+                ),
+                ButtonSegment(
+                  value: AnnouncementType.recordatorio,
+                  label: Text('Recordatorio'),
+                  icon: Icon(Icons.notifications_active_outlined),
+                ),
+                ButtonSegment(
+                  value: AnnouncementType.update,
+                  label: Text('Actualización'),
+                  icon: Icon(Icons.system_update_outlined),
+                ),
+              ],
+              selected: {_selectedType},
+              onSelectionChanged: (selection) {
+                setState(() {
+                  _selectedType = selection.first;
+                });
+              },
+            ),
+            if (_selectedType == AnnouncementType.update) ...[
+              const SizedBox(height: 16),
+              TextField(
+                controller: _linkController,
+                decoration: const InputDecoration(
+                  labelText: 'Enlace de descarga',
+                  hintText: 'https://...',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
