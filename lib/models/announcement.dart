@@ -3,6 +3,9 @@ enum AnnouncementType {
   /// A general notice or information message.
   aviso,
 
+  /// A reminder notification.
+  recordatorio,
+
   /// An app update notification with an optional download link.
   update;
 
@@ -11,6 +14,7 @@ enum AnnouncementType {
   /// Defaults to [AnnouncementType.aviso] for unknown values.
   static AnnouncementType fromString(String s) => switch (s) {
     'aviso' => AnnouncementType.aviso,
+    'recordatorio' => AnnouncementType.recordatorio,
     'update' => AnnouncementType.update,
     _ => AnnouncementType.aviso,
   };
@@ -30,7 +34,7 @@ class Announcement {
   /// Full message body of the announcement.
   final String message;
 
-  /// The type of announcement (aviso or update).
+  /// The type of announcement (aviso, recordatorio, or update).
   final AnnouncementType type;
 
   /// Optional download link, used when [type] is [AnnouncementType.update].
