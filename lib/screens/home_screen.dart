@@ -737,18 +737,22 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    // Find the next schedule after the current period where userId differs.
-    CleaningSchedule? nextSchedule;
+    // Collect unique users with future schedules (excluding current user).
+    final futureUsers = <String, ({UserModel user, DateTime nextDate})>{};
     for (final s in _schedules) {
       if (s.userId != currentUser.id &&
           s.date.isAfter(currentPeriodSchedule.date)) {
-        if (nextSchedule == null || s.date.isBefore(nextSchedule.date)) {
-          nextSchedule = s;
+        if (!futureUsers.containsKey(s.userId) ||
+            s.date.isBefore(futureUsers[s.userId]!.nextDate)) {
+          final user = _users.where((u) => u.id == s.userId).firstOrNull;
+          if (user != null) {
+            futureUsers[s.userId] = (user: user, nextDate: s.date);
+          }
         }
       }
     }
 
-    if (nextSchedule == null) {
+    if (futureUsers.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -761,22 +765,56 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    // Look up the next user's name and room from the already-loaded _users list.
-    final nextUser = _users
-        .where((u) => u.id == nextSchedule!.userId)
-        .firstOrNull;
-    final nextUserName = nextUser?.name ?? 'el siguiente usuario';
-    final nextUserRoom = nextUser?.room ?? '';
+    // Sort users by their next scheduled date (earliest first).
+    final sortedUsers = futureUsers.values.toList()
+      ..sort((a, b) => a.nextDate.compareTo(b.nextDate));
 
-    // Show confirmation dialog.
+    if (!mounted) return;
+
+    // Show user selection dialog.
+    final selectedUser = await showDialog<UserModel>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('¿Con quién deseas intercambiar?'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: sortedUsers.length,
+            itemBuilder: (ctx, index) {
+              final entry = sortedUsers[index];
+              return ListTile(
+                leading: CircleAvatar(child: Text(entry.user.name[0])),
+                title: Text(entry.user.name),
+                subtitle: Text(
+                  '${entry.user.room} — Próximo turno: ${_formatDate(entry.nextDate)}',
+                ),
+                onTap: () => Navigator.pop(ctx, entry.user),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+        ],
+      ),
+    );
+
+    if (selectedUser == null) return;
+    if (!mounted) return;
+
+    // Show confirmation dialog with the selected user.
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Confirmar Prórroga'),
         content: Text(
-          '¿Deseas intercambiar tu periodo de aseo con $nextUserName'
-          '${nextUserRoom.isNotEmpty ? ' ($nextUserRoom)' : ''}?\n\n'
-          'Tu periodo será intercambiado con el siguiente turno.',
+          '¿Deseas intercambiar tu periodo de aseo con ${selectedUser.name}'
+          '${selectedUser.room.isNotEmpty ? ' (${selectedUser.room})' : ''}?\n\n'
+          'Tu periodo será intercambiado con su siguiente turno.',
         ),
         actions: [
           TextButton(
@@ -793,12 +831,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (confirmed != true) return;
 
-    // Proceed with creating the extension request.
-    await _requestExtension();
+    // Proceed with creating the extension request for the selected user.
+    await _requestExtension(selectedUser.id);
   }
 
-  /// Sends an extension request for the current period's schedule.
-  Future<void> _requestExtension() async {
+  /// Sends an extension request for the current period's schedule,
+  /// targeting [targetUserId] as the next responsible user.
+  Future<void> _requestExtension(String targetUserId) async {
     setState(() => _isRequestingExtension = true);
 
     try {
@@ -832,18 +871,18 @@ class _HomeScreenState extends State<HomeScreen> {
         return;
       }
 
-      // Find the next schedule after the current period where userId differs.
-      CleaningSchedule? nextSchedule;
+      // Find the first future schedule belonging to targetUserId.
+      CleaningSchedule? targetSchedule;
       for (final s in _schedules) {
-        if (s.userId != currentUser.id &&
+        if (s.userId == targetUserId &&
             s.date.isAfter(currentPeriodSchedule.date)) {
-          if (nextSchedule == null || s.date.isBefore(nextSchedule.date)) {
-            nextSchedule = s;
+          if (targetSchedule == null || s.date.isBefore(targetSchedule.date)) {
+            targetSchedule = s;
           }
         }
       }
 
-      if (nextSchedule == null) {
+      if (targetSchedule == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -859,7 +898,7 @@ class _HomeScreenState extends State<HomeScreen> {
       await SupabaseService.instance.createExtensionRequest(
         scheduleId: currentPeriodSchedule.id,
         requesterId: currentUser.id,
-        nextUserId: nextSchedule.userId,
+        nextUserId: targetUserId,
       );
 
       if (mounted) {
