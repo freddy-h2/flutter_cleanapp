@@ -11,11 +11,15 @@ class UserModel {
 
   final UserRole role;
 
+  /// ARGB32 integer representing the user's chosen color, or null for default.
+  final int? colorValue;
+
   const UserModel({
     required this.id,
     required this.name,
     required this.room,
     this.role = UserRole.user,
+    this.colorValue,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) => UserModel(
@@ -23,6 +27,7 @@ class UserModel {
     name: json["name"] as String,
     room: json["room"] as String,
     role: json["role"] == "admin" ? UserRole.admin : UserRole.user,
+    colorValue: json["color"] as int?,
   );
 
   Map<String, dynamic> toJson() => {
@@ -30,6 +35,7 @@ class UserModel {
     "name": name,
     "room": room,
     "role": role == UserRole.admin ? "admin" : "user",
+    "color": colorValue,
   };
 
   /// Returns true if this user has admin privileges.

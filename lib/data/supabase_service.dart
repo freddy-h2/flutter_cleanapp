@@ -49,16 +49,36 @@ class SupabaseService {
   // --- Profiles ---
 
   /// Updates the current user's profile name and/or room.
-  Future<void> updateProfile({String? name, String? room}) async {
+  ///
+  /// Optionally accepts a [color] (ARGB32 integer) to update the user's color.
+  /// Pass [clearColor] as true to reset the color to null (default).
+  Future<void> updateProfile({
+    String? name,
+    String? room,
+    int? color,
+    bool clearColor = false,
+  }) async {
     final userId = SupabaseConfig.client.auth.currentUser?.id;
     if (userId == null) return;
     final updates = <String, dynamic>{};
     if (name != null) updates['name'] = name;
     if (room != null) updates['room'] = room;
+    if (color != null) updates['color'] = color;
+    if (clearColor) updates['color'] = null;
     if (updates.isEmpty) return;
     await SupabaseConfig.client
         .from('profiles')
         .update(updates)
+        .eq('id', userId);
+  }
+
+  /// Updates the color of the user with [userId].
+  ///
+  /// [colorValue] is an ARGB32 integer, or null to reset to default.
+  Future<void> updateUserColor(String userId, int? colorValue) async {
+    await SupabaseConfig.client
+        .from('profiles')
+        .update({'color': colorValue})
         .eq('id', userId);
   }
 
