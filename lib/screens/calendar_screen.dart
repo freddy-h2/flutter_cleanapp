@@ -115,6 +115,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
   }
 
+  /// Returns white or black depending on the luminance of [color].
+  Color _contrastColor(Color color) {
+    final luminance = color.computeLuminance();
+    return luminance > 0.5 ? Colors.black : Colors.white;
+  }
+
   /// Returns the color assigned to [userId].
   /// Prefers the user's stored colorValue from the database.
   /// Falls back to a deterministic color from [_presetColors] based on user index.
@@ -153,14 +159,25 @@ class _CalendarScreenState extends State<CalendarScreen> {
     Colors.blueGrey,
   ];
 
-  /// Shows a color picker dialog for the given [user] (admin only).
-  Future<void> _showColorPicker(UserModel user) async {
-    final currentColor = _getUserColor(user.id);
+  /// Shows a color picker dialog for the given [targetUser].
+  ///
+  /// Colors already in use by other users are shown faded with an X overlay
+  /// and cannot be selected.
+  Future<void> _showColorPicker(UserModel targetUser) async {
+    // Collect colors used by other users.
+    final usedColors = <int>{};
+    for (final user in _users) {
+      if (user.id == targetUser.id) continue;
+      final color = _getUserColor(user.id);
+      usedColors.add(color.toARGB32());
+    }
+
+    final currentColor = _getUserColor(targetUser.id);
     final picked = await showDialog<Color>(
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          title: Text('Color de ${user.name}'),
+          title: Text('Color de ${targetUser.name}'),
           content: SizedBox(
             width: 280,
             child: Wrap(
@@ -168,22 +185,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
               runSpacing: 8,
               children: [
                 for (final color in _presetColors)
-                  GestureDetector(
-                    onTap: () => Navigator.pop(ctx, color),
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: color,
-                        shape: BoxShape.circle,
-                        border: color.toARGB32() == currentColor.toARGB32()
-                            ? Border.all(
-                                color: Theme.of(ctx).colorScheme.onSurface,
-                                width: 3,
-                              )
-                            : null,
-                      ),
-                    ),
+                  _buildColorCircle(
+                    color: color,
+                    isSelected: color.toARGB32() == currentColor.toARGB32(),
+                    isDisabled: usedColors.contains(color.toARGB32()),
+                    onTap: usedColors.contains(color.toARGB32())
+                        ? null
+                        : () => Navigator.pop(ctx, color),
+                    context: ctx,
                   ),
               ],
             ),
@@ -200,10 +209,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
     if (picked != null) {
       try {
         await SupabaseService.instance.updateUserColor(
-          user.id,
+          targetUser.id,
           picked.toARGB32(),
         );
-        // Reload users to get updated color
+        // Reload users to get updated color.
         final users = await SupabaseService.instance.getUsers();
         if (mounted) {
           setState(() => _users = users);
@@ -216,6 +225,45 @@ class _CalendarScreenState extends State<CalendarScreen> {
         }
       }
     }
+  }
+
+  /// Builds a single color circle for the color picker dialog.
+  ///
+  /// [isDisabled] colors are shown at 30% opacity with an X icon and cannot
+  /// be tapped. [isSelected] colors get a thick border.
+  Widget _buildColorCircle({
+    required Color color,
+    required bool isSelected,
+    required bool isDisabled,
+    required VoidCallback? onTap,
+    required BuildContext context,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: isDisabled ? color.withValues(alpha: 0.3) : color,
+          shape: BoxShape.circle,
+          border: isSelected
+              ? Border.all(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  width: 3,
+                )
+              : null,
+        ),
+        child: isDisabled
+            ? Icon(
+                Icons.close,
+                size: 20,
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.5),
+              )
+            : null,
+      ),
+    );
   }
 
   /// Returns the extension request for [schedule], or null if none.
@@ -490,20 +538,20 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   '${_formatDate(lastDate)}'
             : '${user.room} — Periodo del ${_formatDate(firstDate)}';
 
-        // Determine card color: own card gets primaryContainer, others default.
+        // Determine card color: own card gets user color at low opacity, others default.
         final Color? cardColor;
         if (isCurrentUser) {
-          cardColor = colorScheme.primaryContainer;
+          cardColor = _getUserColor(user.id).withValues(alpha: 0.15);
         } else {
           cardColor = null;
         }
 
-        // Determine card shape: own card gets a primary border, others default.
+        // Determine card shape: own card gets a user-color border, others default.
         final ShapeBorder? cardShape;
         if (isCurrentUser) {
           cardShape = ContinuousRectangleBorder(
             borderRadius: BorderRadius.circular(40),
-            side: BorderSide(color: colorScheme.primary, width: 2),
+            side: BorderSide(color: _getUserColor(user.id), width: 2),
           );
         } else {
           cardShape = null;
@@ -519,10 +567,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
               children: [
                 CircleAvatar(
                   backgroundColor: isCurrentPeriod
-                      ? colorScheme.primary
-                      : colorScheme.surfaceContainerHighest,
+                      ? _getUserColor(user.id)
+                      : _getUserColor(user.id).withValues(alpha: 0.3),
                   foregroundColor: isCurrentPeriod
-                      ? colorScheme.onPrimary
+                      ? _contrastColor(_getUserColor(user.id))
                       : colorScheme.onSurfaceVariant,
                   child: Text(user.name[0]),
                 ),
