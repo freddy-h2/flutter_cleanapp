@@ -206,6 +206,50 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
     );
   }
 
+  Future<void> _deleteTask(CleaningTask task) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar actividad'),
+        content: Text(
+          '¿Estás seguro de que deseas eliminar "${task.title}"?\n\n'
+          'Esta acción no se puede deshacer.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await SupabaseService.instance.deleteTask(task.id);
+      await _loadTasks();
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Actividad eliminada')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al eliminar actividad: $e')),
+        );
+      }
+    }
+  }
+
   Future<void> _toggleActive(CleaningTask task, bool value) async {
     try {
       await SupabaseService.instance.updateTask(task.id, isActive: value);
@@ -290,6 +334,14 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                             icon: const Icon(Icons.edit),
                             onPressed: () => _showEditDialog(task),
                             tooltip: 'Editar',
+                          ),
+                          IconButton(
+                            icon: Icon(
+                              Icons.delete_outline,
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                            onPressed: () => _deleteTask(task),
+                            tooltip: 'Eliminar',
                           ),
                           Switch(
                             value: task.isActive,
