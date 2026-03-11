@@ -380,12 +380,30 @@ class _HomeScreenState extends State<HomeScreen> {
   /// Builds a banner card for the given [announcement].
   Widget _buildAnnouncementBanner(Announcement announcement) {
     final colorScheme = Theme.of(context).colorScheme;
-    final isUpdate = announcement.type == AnnouncementType.update;
+    final (
+      IconData icon,
+      Color cardColor,
+      Color contentColor,
+    ) = switch (announcement.type) {
+      AnnouncementType.update => (
+        CupertinoIcons.arrow_down_circle_fill,
+        colorScheme.primaryContainer,
+        colorScheme.onPrimaryContainer,
+      ),
+      AnnouncementType.recordatorio => (
+        CupertinoIcons.bell_fill,
+        colorScheme.tertiaryContainer,
+        colorScheme.onTertiaryContainer,
+      ),
+      AnnouncementType.aviso => (
+        CupertinoIcons.speaker_fill,
+        colorScheme.secondaryContainer,
+        colorScheme.onSecondaryContainer,
+      ),
+    };
 
     return Card(
-      color: isUpdate
-          ? colorScheme.primaryContainer
-          : colorScheme.secondaryContainer,
+      color: cardColor,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -393,23 +411,14 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Row(
               children: [
-                Icon(
-                  isUpdate
-                      ? CupertinoIcons.arrow_down_circle_fill
-                      : CupertinoIcons.speaker_fill,
-                  color: isUpdate
-                      ? colorScheme.onPrimaryContainer
-                      : colorScheme.onSecondaryContainer,
-                ),
+                Icon(icon, color: contentColor),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     announcement.title,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: isUpdate
-                          ? colorScheme.onPrimaryContainer
-                          : colorScheme.onSecondaryContainer,
+                      color: contentColor,
                     ),
                   ),
                 ),
@@ -427,13 +436,12 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 8),
             Text(
               announcement.message,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: isUpdate
-                    ? colorScheme.onPrimaryContainer
-                    : colorScheme.onSecondaryContainer,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: contentColor),
             ),
-            if (isUpdate && announcement.link != null) ...[
+            if (announcement.type == AnnouncementType.update &&
+                announcement.link != null) ...[
               const SizedBox(height: 12),
               FilledButton.icon(
                 icon: const Icon(CupertinoIcons.arrow_down_to_line),

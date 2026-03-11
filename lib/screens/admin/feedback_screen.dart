@@ -180,6 +180,11 @@ class _FeedbackScreenState extends State<FeedbackScreen>
                       icon: Icon(Icons.campaign_outlined),
                     ),
                     ButtonSegment(
+                      value: AnnouncementType.recordatorio,
+                      label: Text('Recordatorio'),
+                      icon: Icon(Icons.notifications_active_outlined),
+                    ),
+                    ButtonSegment(
                       value: AnnouncementType.update,
                       label: Text('Actualización'),
                       icon: Icon(Icons.system_update_outlined),
@@ -300,6 +305,11 @@ class _FeedbackScreenState extends State<FeedbackScreen>
                       value: AnnouncementType.aviso,
                       label: Text('Aviso'),
                       icon: Icon(Icons.campaign_outlined),
+                    ),
+                    ButtonSegment(
+                      value: AnnouncementType.recordatorio,
+                      label: Text('Recordatorio'),
+                      icon: Icon(Icons.notifications_active_outlined),
                     ),
                     ButtonSegment(
                       value: AnnouncementType.update,
@@ -435,7 +445,16 @@ class _FeedbackScreenState extends State<FeedbackScreen>
                 separatorBuilder: (_, _) => const SizedBox(height: 8),
                 itemBuilder: (context, index) {
                   final item = _announcements[index];
-                  final isUpdate = item.type == AnnouncementType.update;
+                  final IconData typeIcon = switch (item.type) {
+                    AnnouncementType.aviso => Icons.campaign,
+                    AnnouncementType.recordatorio => Icons.notifications_active,
+                    AnnouncementType.update => Icons.system_update,
+                  };
+                  final String typeLabel = switch (item.type) {
+                    AnnouncementType.aviso => 'Aviso',
+                    AnnouncementType.recordatorio => 'Recordatorio',
+                    AnnouncementType.update => 'Actualización',
+                  };
                   return Card(
                     child: Padding(
                       padding: const EdgeInsets.all(12),
@@ -444,10 +463,7 @@ class _FeedbackScreenState extends State<FeedbackScreen>
                         children: [
                           Row(
                             children: [
-                              Icon(
-                                isUpdate ? Icons.system_update : Icons.campaign,
-                                size: 20,
-                              ),
+                              Icon(typeIcon, size: 20),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
@@ -500,9 +516,7 @@ class _FeedbackScreenState extends State<FeedbackScreen>
                           Row(
                             children: [
                               Chip(
-                                label: Text(
-                                  isUpdate ? 'Actualización' : 'Aviso',
-                                ),
+                                label: Text(typeLabel),
                                 visualDensity: VisualDensity.compact,
                               ),
                               const SizedBox(width: 8),
@@ -512,7 +526,8 @@ class _FeedbackScreenState extends State<FeedbackScreen>
                               ),
                             ],
                           ),
-                          if (isUpdate && item.link != null) ...[
+                          if (item.type == AnnouncementType.update &&
+                              item.link != null) ...[
                             const SizedBox(height: 4),
                             Text(
                               item.link!,

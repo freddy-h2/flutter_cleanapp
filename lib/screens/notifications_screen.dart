@@ -30,12 +30,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     try {
       final announcements = await SupabaseService.instance
           .getActiveAnnouncements();
-      // Sort: update-type first, then avisos. Within each group, newest first.
+      // Sort: updates first, then recordatorios, then avisos. Within each
+      // group, newest first.
       announcements.sort((a, b) {
-        final aIsUpdate = a.type == AnnouncementType.update;
-        final bIsUpdate = b.type == AnnouncementType.update;
-        if (aIsUpdate && !bIsUpdate) return -1;
-        if (!aIsUpdate && bIsUpdate) return 1;
+        final order = {
+          AnnouncementType.update: 0,
+          AnnouncementType.recordatorio: 1,
+          AnnouncementType.aviso: 2,
+        };
+        final typeCompare = order[a.type]!.compareTo(order[b.type]!);
+        if (typeCompare != 0) return typeCompare;
         return b.createdAt.compareTo(a.createdAt);
       });
       if (mounted) {
@@ -70,12 +74,30 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   /// Builds a card for the given [announcement].
   Widget _buildAnnouncementCard(Announcement announcement) {
     final colorScheme = Theme.of(context).colorScheme;
-    final isUpdate = announcement.type == AnnouncementType.update;
+    final (
+      IconData icon,
+      Color cardColor,
+      Color contentColor,
+    ) = switch (announcement.type) {
+      AnnouncementType.update => (
+        CupertinoIcons.arrow_down_circle_fill,
+        colorScheme.primaryContainer,
+        colorScheme.onPrimaryContainer,
+      ),
+      AnnouncementType.recordatorio => (
+        CupertinoIcons.bell_fill,
+        colorScheme.tertiaryContainer,
+        colorScheme.onTertiaryContainer,
+      ),
+      AnnouncementType.aviso => (
+        CupertinoIcons.speaker_2_fill,
+        colorScheme.secondaryContainer,
+        colorScheme.onSecondaryContainer,
+      ),
+    };
 
     return Card(
-      color: isUpdate
-          ? colorScheme.primaryContainer
-          : colorScheme.secondaryContainer,
+      color: cardColor,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -83,29 +105,24 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           children: [
             Row(
               children: [
-                Icon(
-                  isUpdate
-                      ? CupertinoIcons.arrow_down_circle_fill
-                      : CupertinoIcons.speaker_2_fill,
-                  color: isUpdate
-                      ? colorScheme.onPrimaryContainer
-                      : colorScheme.onSecondaryContainer,
-                ),
+                Icon(icon, color: contentColor),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     announcement.title,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: isUpdate
-                          ? colorScheme.onPrimaryContainer
-                          : colorScheme.onSecondaryContainer,
+                      color: contentColor,
                     ),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Chip(
-                  label: Text(isUpdate ? 'Actualización' : 'Aviso'),
+                  label: Text(switch (announcement.type) {
+                    AnnouncementType.aviso => 'Aviso',
+                    AnnouncementType.recordatorio => 'Recordatorio',
+                    AnnouncementType.update => 'Actualización',
+                  }),
                   visualDensity: VisualDensity.compact,
                 ),
               ],
@@ -113,11 +130,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             const SizedBox(height: 8),
             Text(
               announcement.message,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: isUpdate
-                    ? colorScheme.onPrimaryContainer
-                    : colorScheme.onSecondaryContainer,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: contentColor),
             ),
             if (widget.isAdmin) ...[
               const SizedBox(height: 4),
@@ -126,7 +141,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
-            if (isUpdate && announcement.link != null) ...[
+            if (announcement.type == AnnouncementType.update &&
+                announcement.link != null) ...[
               const SizedBox(height: 12),
               FilledButton.icon(
                 icon: const Icon(CupertinoIcons.square_arrow_down),
