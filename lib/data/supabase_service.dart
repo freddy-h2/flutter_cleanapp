@@ -616,17 +616,20 @@ class SupabaseService {
 
   /// Creates a new announcement (admin only).
   ///
-  /// If [type] is [AnnouncementType.update], all existing active update
-  /// announcements are deactivated first so only the newest one stays active.
+  /// If [type] is [AnnouncementType.update] and [isActive] is true, all
+  /// existing active update announcements are deactivated first so only the
+  /// newest one stays active. When [isActive] is false, the announcement is
+  /// saved but not published (inactive).
   Future<void> createAnnouncement({
     required String senderId,
     required String title,
     required String message,
     required AnnouncementType type,
     String? link,
+    bool isActive = true,
   }) async {
-    // If publishing a new update, deactivate all previous active updates.
-    if (type == AnnouncementType.update) {
+    // Only deactivate previous updates when publishing (isActive == true).
+    if (type == AnnouncementType.update && isActive) {
       await SupabaseConfig.client
           .from('announcements')
           .update({'is_active': false})
@@ -639,6 +642,7 @@ class SupabaseService {
       'message': message,
       'type': type.name,
       'link': link,
+      'is_active': isActive,
     });
   }
 

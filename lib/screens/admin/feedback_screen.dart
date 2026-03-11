@@ -157,10 +157,17 @@ class _FeedbackScreenState extends State<FeedbackScreen>
           message: result.message,
           type: result.type,
           link: result.link,
+          isActive: result.isActive,
         );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Comunicado publicado.')),
+            SnackBar(
+              content: Text(
+                result.isActive
+                    ? 'Comunicado publicado.'
+                    : 'Comunicado guardado (desactivado).',
+              ),
+            ),
           );
         }
         await _loadData();
@@ -422,12 +429,14 @@ class _AnnouncementFormResult {
     required this.message,
     required this.type,
     this.link,
+    this.isActive = true,
   });
 
   final String title;
   final String message;
   final AnnouncementType type;
   final String? link;
+  final bool isActive;
 }
 
 /// Full-screen form route for creating or editing an announcement.
@@ -477,7 +486,7 @@ class _AnnouncementFormRouteState extends State<_AnnouncementFormRoute> {
     super.dispose();
   }
 
-  void _submit() {
+  void _submitWith({required bool isActive}) {
     final title = _titleController.text.trim();
     final message = _messageController.text.trim();
     if (title.isEmpty || message.isEmpty) return;
@@ -493,6 +502,7 @@ class _AnnouncementFormRouteState extends State<_AnnouncementFormRoute> {
         message: message,
         type: _selectedType,
         link: link,
+        isActive: isActive,
       ),
     );
   }
@@ -506,15 +516,32 @@ class _AnnouncementFormRouteState extends State<_AnnouncementFormRoute> {
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.pop(context),
         ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: FilledButton(
-              onPressed: _submit,
-              child: Text(widget.actionLabel),
-            ),
-          ),
-        ],
+        actions: widget.actionLabel == 'Publicar'
+            ? [
+                Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: OutlinedButton(
+                    onPressed: () => _submitWith(isActive: false),
+                    child: const Text('Guardar'),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: FilledButton(
+                    onPressed: () => _submitWith(isActive: true),
+                    child: Text(widget.actionLabel),
+                  ),
+                ),
+              ]
+            : [
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: FilledButton(
+                    onPressed: () => _submitWith(isActive: true),
+                    child: Text(widget.actionLabel),
+                  ),
+                ),
+              ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
