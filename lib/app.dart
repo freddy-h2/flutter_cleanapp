@@ -517,7 +517,10 @@ class _LimpyAppState extends State<LimpyApp> with WidgetsBindingObserver {
             ),
             onPressed: () {
               _navigatorKey.currentState?.push(
-                CupertinoPageRoute(builder: (_) => const NotificationsScreen()),
+                CupertinoPageRoute(
+                  builder: (_) =>
+                      NotificationsScreen(isAdmin: _currentUser!.isAdmin),
+                ),
               );
             },
           ),

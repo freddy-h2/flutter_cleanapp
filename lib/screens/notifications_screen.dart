@@ -6,8 +6,11 @@ import 'package:url_launcher/url_launcher.dart';
 
 /// Screen showing the full history of announcements for all users.
 class NotificationsScreen extends StatefulWidget {
+  /// Whether the current user has admin privileges.
+  final bool isAdmin;
+
   /// Creates a [NotificationsScreen].
-  const NotificationsScreen({super.key});
+  const NotificationsScreen({super.key, required this.isAdmin});
 
   @override
   State<NotificationsScreen> createState() => _NotificationsScreenState();
@@ -116,11 +119,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     : colorScheme.onSecondaryContainer,
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              _formatDate(announcement.createdAt),
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
+            if (widget.isAdmin) ...[
+              const SizedBox(height: 4),
+              Text(
+                _formatDate(announcement.createdAt),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
             if (isUpdate && announcement.link != null) ...[
               const SizedBox(height: 12),
               FilledButton.icon(
