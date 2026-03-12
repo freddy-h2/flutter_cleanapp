@@ -40,7 +40,7 @@ class _HomeScreenState extends State<HomeScreen> {
   static const String _prefKnownAnnouncementIds = 'known_announcement_ids';
   static const String _prefNotifiedIncomingRequestId =
       'notified_incoming_request_id';
-  static const String _prefLastCommentCount = 'last_comment_count';
+  static const String _prefKnownCommentIds = 'known_comment_ids';
   static const String _prefDismissedAnnouncementIds =
       'dismissed_announcement_ids';
 
@@ -83,8 +83,8 @@ class _HomeScreenState extends State<HomeScreen> {
   /// when it transitions to accepted or rejected.
   String? _ownPendingRequestId;
 
-  /// Tracks the last known top-level comment count to detect new comments.
-  int _lastKnownCommentCount = 0;
+  /// IDs of top-level comments we have already seen, to detect new ones.
+  Set<String> _knownCommentIds = {};
 
   /// Active announcements to display as banners.
   List<Announcement> _announcements = [];
@@ -162,7 +162,10 @@ class _HomeScreenState extends State<HomeScreen> {
       _prefNotifiedIncomingRequestId,
     );
 
-    _lastKnownCommentCount = prefs.getInt(_prefLastCommentCount) ?? 0;
+    final knownCommentIds = prefs.getStringList(_prefKnownCommentIds);
+    if (knownCommentIds != null) {
+      _knownCommentIds = knownCommentIds.toSet();
+    }
 
     // Check if we already scheduled cleaning notifications for the current
     // schedule.
@@ -263,12 +266,15 @@ class _HomeScreenState extends State<HomeScreen> {
             currentPeriodSchedule.id,
           );
 
-          // Initialize comment count to avoid false notifications on first load.
+          // Initialize known comment IDs to avoid false notifications on first load.
           try {
             final comments = await SupabaseService.instance
                 .getCommentsWithReplies(currentPeriodSchedule.id);
-            _lastKnownCommentCount = comments.keys.length;
-            await prefs.setInt(_prefLastCommentCount, _lastKnownCommentCount);
+            _knownCommentIds = comments.keys.map((c) => c.id).toSet();
+            await prefs.setStringList(
+              _prefKnownCommentIds,
+              _knownCommentIds.toList(),
+            );
           } catch (_) {}
         }
       }
@@ -323,31 +329,31 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (currentSchedule == null) return;
 
-      // Fetch top-level comments count.
+      // Fetch top-level comments with their IDs.
       final comments = await SupabaseService.instance.getCommentsWithReplies(
         currentSchedule.id,
       );
-      final topLevelCount = comments.keys.length;
+      final currentCommentIds = comments.keys.map((c) => c.id).toSet();
 
-      if (_lastKnownCommentCount > 0 &&
-          topLevelCount > _lastKnownCommentCount) {
-        final newCount = topLevelCount - _lastKnownCommentCount;
-        for (var i = 0; i < newCount; i++) {
-          final commentIndex = _lastKnownCommentCount + i;
+      // Only notify when we have a baseline (i.e., not the very first load).
+      if (_knownCommentIds.isNotEmpty) {
+        final newCommentIds = currentCommentIds.difference(_knownCommentIds);
+        for (final commentId in newCommentIds) {
           if (await NotificationDedupService.instance.shouldNotify(
-            'comment:${currentSchedule.id}:$commentIndex',
+            'comment:$commentId',
           )) {
-            NotificationService.instance.notifyNewComment(
-              commentIndex: commentIndex,
-            );
+            NotificationService.instance.notifyNewComment(commentIndex: 0);
           }
         }
       }
-      _lastKnownCommentCount = topLevelCount;
+      _knownCommentIds = currentCommentIds;
 
-      // Persist updated comment count.
+      // Persist updated known comment IDs.
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt(_prefLastCommentCount, _lastKnownCommentCount);
+      await prefs.setStringList(
+        _prefKnownCommentIds,
+        _knownCommentIds.toList(),
+      );
     } catch (_) {
       // Non-fatal
     }
