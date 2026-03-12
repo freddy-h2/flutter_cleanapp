@@ -253,10 +253,23 @@ class _LimpyAppState extends State<LimpyApp> with WidgetsBindingObserver {
     await BackgroundService.instance.stopPeriodicCheck();
     await BackgroundService.instance.clearUserContext();
     // Deactivate FCM token before signing out.
+    // deactivateToken() only acts when _currentToken is non-null (i.e. getToken()
+    // was called successfully). If it was never called (e.g. _loadCurrentUser()
+    // failed or FCM was unavailable), fall back to deactivating ALL device tokens
+    // for this user so the device stops receiving push notifications after logout.
     try {
       await PushNotificationService.instance.deactivateToken();
     } catch (e) {
       debugPrint('Error deactivating FCM token: $e');
+    }
+    if (_currentUser != null) {
+      try {
+        await SupabaseService.instance.deactivateAllDeviceTokens(
+          userId: _currentUser!.id,
+        );
+      } catch (e) {
+        debugPrint('Error deactivating all device tokens: $e');
+      }
     }
     // Clear notification dedup state on logout.
     await NotificationDedupService.instance.clear();
