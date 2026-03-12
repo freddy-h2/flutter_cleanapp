@@ -6,6 +6,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_cleanapp/core/background_service.dart';
+import 'package:flutter_cleanapp/core/push_notification_service.dart';
 import 'package:flutter_cleanapp/core/realtime_service.dart';
 import 'package:flutter_cleanapp/core/supabase_config.dart';
 import 'package:flutter_cleanapp/core/theme/app_theme.dart';
@@ -155,6 +156,26 @@ class _LimpyAppState extends State<LimpyApp> with WidgetsBindingObserver {
       if (user != null) {
         await BackgroundService.instance.updateUserContext(userId: user.id);
         await BackgroundService.instance.startPeriodicCheck();
+        // Register FCM token for push notifications.
+        PushNotificationService.instance.onTokenRefresh = (token) async {
+          await SupabaseService.instance.registerDeviceToken(
+            userId: user.id,
+            token: token,
+          );
+        };
+        PushNotificationService.instance.onTokenDeactivate = (token) async {
+          await SupabaseService.instance.deactivateDeviceToken(
+            userId: user.id,
+            token: token,
+          );
+        };
+        final fcmToken = await PushNotificationService.instance.getToken();
+        if (fcmToken != null) {
+          await SupabaseService.instance.registerDeviceToken(
+            userId: user.id,
+            token: fcmToken,
+          );
+        }
         // Run cleanup once on startup (non-fatal if it fails).
         SupabaseService.instance.cleanupOldSchedules().catchError((_) => 0);
       }
@@ -230,6 +251,12 @@ class _LimpyAppState extends State<LimpyApp> with WidgetsBindingObserver {
   Future<void> _logout() async {
     await BackgroundService.instance.stopPeriodicCheck();
     await BackgroundService.instance.clearUserContext();
+    // Deactivate FCM token before signing out.
+    try {
+      await PushNotificationService.instance.deactivateToken();
+    } catch (e) {
+      debugPrint('Error deactivating FCM token: $e');
+    }
     await SupabaseConfig.client.auth.signOut();
   }
 

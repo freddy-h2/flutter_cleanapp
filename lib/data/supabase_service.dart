@@ -691,6 +691,54 @@ class SupabaseService {
         .eq('id', announcementId);
   }
 
+  // --- Device Tokens ---
+
+  /// Register or update an FCM device token for the current user.
+  ///
+  /// Uses UPSERT on (user_id, token) to handle re-registration gracefully.
+  Future<void> registerDeviceToken({
+    required String userId,
+    required String token,
+    String platform = 'android',
+  }) async {
+    await SupabaseConfig.client.from('device_tokens').upsert({
+      'user_id': userId,
+      'token': token,
+      'platform': platform,
+      'is_active': true,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }, onConflict: 'user_id,token');
+  }
+
+  /// Deactivate an FCM device token (e.g., on logout).
+  ///
+  /// Sets is_active = false rather than deleting, so the token can be
+  /// reactivated on next login without a full re-registration.
+  Future<void> deactivateDeviceToken({
+    required String userId,
+    required String token,
+  }) async {
+    await SupabaseConfig.client
+        .from('device_tokens')
+        .update({
+          'is_active': false,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('user_id', userId)
+        .eq('token', token);
+  }
+
+  /// Deactivate ALL device tokens for a user (e.g., on full logout).
+  Future<void> deactivateAllDeviceTokens({required String userId}) async {
+    await SupabaseConfig.client
+        .from('device_tokens')
+        .update({
+          'is_active': false,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('user_id', userId);
+  }
+
   // --- Maintenance ---
 
   /// Deletes completed schedules older than 7 days.
