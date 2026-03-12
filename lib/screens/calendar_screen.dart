@@ -297,6 +297,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
         final nextUserPeriodIds = _findNextUserPeriodIds(
           requesterPeriodIds,
           request.nextUserId,
+          request.requesterId,
         );
         if (nextUserPeriodIds.contains(schedule.id)) return request;
       }
@@ -373,6 +374,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   Set<String> _findNextUserPeriodIds(
     Set<String> requesterPeriodIds,
     String nextUserId,
+    String requesterId,
   ) {
     final sorted = List<CleaningSchedule>.from(_schedules)
       ..sort((a, b) => a.date.compareTo(b.date));
@@ -389,14 +391,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
     if (lastRequesterDate == null) return {};
 
-    // Find the first schedule after the requester's period end.
-    // After the swap, the next user's period now has requesterId as userId,
-    // so we match by position (immediately after) rather than by userId.
+    // Find the first schedule after the requester's period end where
+    // userId == requesterId. After the swap, the requester's userId moved to
+    // the partner's original dates, so we filter by requesterId to skip any
+    // uninvolved users between the two swap participants.
     final ids = <String>{};
     CleaningSchedule? periodAnchor;
     for (final s in sorted) {
       final d = DateTime(s.date.year, s.date.month, s.date.day);
-      if (d.isAfter(lastRequesterDate) && !requesterPeriodIds.contains(s.id)) {
+      if (d.isAfter(lastRequesterDate) &&
+          !requesterPeriodIds.contains(s.id) &&
+          s.userId == requesterId) {
         periodAnchor = s;
         break;
       }
