@@ -46,3 +46,7 @@ app.*.map.json
 
 # Environment files
 .env*
+
+# Firebase
+**/google-services.json
+**/GoogleService-Info.plist
