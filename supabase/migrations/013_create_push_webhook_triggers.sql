@@ -14,7 +14,35 @@
 CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA extensions;
 
 -- ============================================================
--- 2. invoke_send_push
+-- 2. notify_push_event (BOOLEAN variant)
+--    Replaces the VOID version from 012.
+--    Returns TRUE if the dedup INSERT succeeded (new event),
+--    FALSE if the event_key already existed (conflict → skip).
+--    In PL/pgSQL, FOUND is only set by SELECT INTO / DML, NOT by
+--    PERFORM, so callers must use the return value directly:
+--      IF public.notify_push_event(...) THEN ...
+-- ============================================================
+CREATE OR REPLACE FUNCTION public.notify_push_event(
+  p_event_key  TEXT,
+  p_event_type TEXT,
+  p_payload    JSONB
+) RETURNS BOOLEAN AS $$
+BEGIN
+  INSERT INTO public.notification_events (event_key, event_type, payload)
+  VALUES (p_event_key, p_event_type, p_payload)
+  ON CONFLICT (event_key) DO NOTHING;
+
+  IF FOUND THEN
+    PERFORM pg_notify('push_events', p_payload::text);
+    RETURN TRUE;
+  END IF;
+
+  RETURN FALSE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================================
+-- 3. invoke_send_push
 --    Calls the send-push Edge Function via HTTP POST using pg_net.
 --    Silently skips (with a WARNING) if the required database
 --    settings are not configured, so triggers never hard-fail.
@@ -35,7 +63,7 @@ BEGIN
     RETURN;
   END IF;
 
-  PERFORM extensions.http_post(
+  PERFORM net.http_post(
     url     := v_supabase_url || '/functions/v1/send-push',
     headers := jsonb_build_object(
       'Content-Type',  'application/json',
@@ -47,7 +75,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ============================================================
--- 3. Updated trigger function: announcements
+-- 4. Updated trigger function: announcements
 --    Replaces the version from 012.
 --    After a successful dedup insert, invokes the Edge Function
 --    for broadcast announcements.
@@ -56,7 +84,10 @@ CREATE OR REPLACE FUNCTION public.trigger_announcement_push()
 RETURNS TRIGGER AS $$
 BEGIN
   IF NEW.is_active = true THEN
-    PERFORM public.notify_push_event(
+    -- notify_push_event returns TRUE if the event is new (dedup passed).
+    -- Using the return value directly avoids the PERFORM+IF FOUND anti-pattern
+    -- (FOUND is never set after PERFORM of a non-DML function).
+    IF public.notify_push_event(
       'announcement:' || NEW.id::text,
       'announcement',
       jsonb_build_object(
@@ -66,10 +97,7 @@ BEGIN
         'message',         NEW.message,
         'broadcast',       true
       )
-    );
-
-    -- Only invoke Edge Function when the dedup insert succeeded (FOUND = true).
-    IF FOUND THEN
+    ) THEN
       PERFORM public.invoke_send_push(
         jsonb_build_object(
           'type',      'announcement',
@@ -91,7 +119,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ============================================================
--- 4. Updated trigger function: extension_requests
+-- 5. Updated trigger function: extension_requests
 --    Replaces the version from 012.
 --    Looks up the requester's display name from profiles and
 --    includes it in the push payload.
@@ -107,7 +135,7 @@ BEGIN
   WHERE id = NEW.requester_id;
 
   IF NEW.status = 'pending' THEN
-    PERFORM public.notify_push_event(
+    IF public.notify_push_event(
       'extension_request:' || NEW.id::text || ':pending',
       'extension_request',
       jsonb_build_object(
@@ -117,9 +145,7 @@ BEGIN
         'target_user_id', NEW.next_user_id,
         'status',         'pending'
       )
-    );
-
-    IF FOUND THEN
+    ) THEN
       PERFORM public.invoke_send_push(
         jsonb_build_object(
           'type',     'extension_request',
@@ -138,7 +164,7 @@ BEGIN
     END IF;
 
   ELSIF NEW.status = 'accepted' THEN
-    PERFORM public.notify_push_event(
+    IF public.notify_push_event(
       'extension_request:' || NEW.id::text || ':accepted',
       'extension_request',
       jsonb_build_object(
@@ -148,9 +174,7 @@ BEGIN
         'target_user_id', NEW.next_user_id,
         'status',         'accepted'
       )
-    );
-
-    IF FOUND THEN
+    ) THEN
       PERFORM public.invoke_send_push(
         jsonb_build_object(
           'type',     'extension_request',
@@ -167,7 +191,7 @@ BEGIN
     END IF;
 
   ELSIF NEW.status = 'rejected' THEN
-    PERFORM public.notify_push_event(
+    IF public.notify_push_event(
       'extension_request:' || NEW.id::text || ':rejected',
       'extension_request',
       jsonb_build_object(
@@ -177,9 +201,7 @@ BEGIN
         'target_user_id', NEW.next_user_id,
         'status',         'rejected'
       )
-    );
-
-    IF FOUND THEN
+    ) THEN
       PERFORM public.invoke_send_push(
         jsonb_build_object(
           'type',     'extension_request',
@@ -201,7 +223,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ============================================================
--- 5. Updated trigger function: comments
+-- 6. Updated trigger function: comments
 --    Replaces the version from 012.
 --    Sends push to the schedule owner when a new comment arrives.
 -- ============================================================
@@ -218,7 +240,7 @@ BEGIN
   IF v_schedule_user_id IS NOT NULL
      AND v_schedule_user_id != COALESCE(NEW.sender_id, '00000000-0000-0000-0000-000000000000'::uuid)
   THEN
-    PERFORM public.notify_push_event(
+    IF public.notify_push_event(
       'comment:' || NEW.id::text,
       'comment',
       jsonb_build_object(
@@ -227,9 +249,7 @@ BEGIN
         'schedule_id',    NEW.schedule_id,
         'target_user_id', v_schedule_user_id
       )
-    );
-
-    IF FOUND THEN
+    ) THEN
       PERFORM public.invoke_send_push(
         jsonb_build_object(
           'type',     'comment',
