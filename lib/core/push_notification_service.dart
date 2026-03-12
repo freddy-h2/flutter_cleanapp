@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_cleanapp/core/notification_dedup_service.dart';
 import 'package:flutter_cleanapp/core/notification_service.dart';
 
@@ -10,6 +10,7 @@ import 'package:flutter_cleanapp/core/notification_service.dart';
 /// Called by FCM when a data message arrives and the app is in background/killed.
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   await NotificationService.instance.initialize();
   await PushNotificationService._handleMessage(message, isBackground: true);
