@@ -371,6 +371,68 @@ void main() {
         expect(result, isEmpty);
       },
     );
+
+    // Test 1: non-adjacent swap skips uninvolved user
+    test('non-adjacent swap — skips uninvolved userB, returns userA period '
+        '(Mar 14-16)', () {
+      // Post-swap state: A↔C swap, B is uninvolved in between.
+      // C: Mar 1-3 (was A's, now userId=userC, nextUserId=userC)
+      // B: Mar 7-9 (unchanged, uninvolved)
+      // A: Mar 14-16 (was C's, now userId=userA, requesterId=userA)
+      final schedules = [
+        _schedule('c1', 'userC', DateTime(2026, 3, 1)),
+        _schedule('c2', 'userC', DateTime(2026, 3, 2)),
+        _schedule('c3', 'userC', DateTime(2026, 3, 3)),
+        _schedule('b1', 'userB', DateTime(2026, 3, 7)),
+        _schedule('b2', 'userB', DateTime(2026, 3, 8)),
+        _schedule('b3', 'userB', DateTime(2026, 3, 9)),
+        _schedule('a1', 'userA', DateTime(2026, 3, 14)),
+        _schedule('a2', 'userA', DateTime(2026, 3, 15)),
+        _schedule('a3', 'userA', DateTime(2026, 3, 16)),
+      ];
+
+      // requesterPeriodIds = schedules for Mar 1-3 (now userC)
+      final requesterPeriodIds = {'c1', 'c2', 'c3'};
+      final result = findNextUserPeriodIds(
+        schedules,
+        requesterPeriodIds,
+        'userC', // nextUserId
+        'userA', // requesterId — filter by this to skip userB
+      );
+
+      // Must return userA's period (Mar 14-16), NOT userB's (Mar 7-9).
+      expect(result, {'a1', 'a2', 'a3'});
+      expect(result.contains('b1'), isFalse, reason: 'b1 must be excluded');
+      expect(result.contains('b2'), isFalse, reason: 'b2 must be excluded');
+      expect(result.contains('b3'), isFalse, reason: 'b3 must be excluded');
+    });
+
+    // Test 4: adjacent swap still works (regression guard)
+    test('adjacent swap regression — B immediately after A, returns B period '
+        '(Mar 7-9)', () {
+      // Post-swap state: A↔B adjacent swap.
+      // B: Mar 1-3 (was A's, now userId=userB)
+      // A: Mar 7-9 (was B's, now userId=userA)
+      final schedules = [
+        _schedule('b1', 'userB', DateTime(2026, 3, 1)),
+        _schedule('b2', 'userB', DateTime(2026, 3, 2)),
+        _schedule('b3', 'userB', DateTime(2026, 3, 3)),
+        _schedule('a1', 'userA', DateTime(2026, 3, 7)),
+        _schedule('a2', 'userA', DateTime(2026, 3, 8)),
+        _schedule('a3', 'userA', DateTime(2026, 3, 9)),
+      ];
+
+      final requesterPeriodIds = {'b1', 'b2', 'b3'};
+      final result = findNextUserPeriodIds(
+        schedules,
+        requesterPeriodIds,
+        'userB', // nextUserId
+        'userA', // requesterId
+      );
+
+      // Should return userA's period (Mar 7-9).
+      expect(result, {'a1', 'a2', 'a3'});
+    });
   });
 
   group('getRequestForSchedule', () {
@@ -510,6 +572,264 @@ void main() {
         );
       },
     );
+
+    // Test 2: non-adjacent accepted swap labels only involved periods
+    test('non-adjacent accepted swap — only A and C periods labeled, B returns '
+        'null', () {
+      // Post-swap state: A↔C swap, B is uninvolved.
+      // C: Mar 1-3 (was A's, anchor a2 is here, now userId=userC)
+      // B: Mar 7-9 (unchanged, uninvolved)
+      // A: Mar 14-16 (was C's, now userId=userA)
+      final schedules = [
+        _schedule('a1', 'userC', DateTime(2026, 3, 1)),
+        _schedule('a2', 'userC', DateTime(2026, 3, 2)), // anchor
+        _schedule('a3', 'userC', DateTime(2026, 3, 3)),
+        _schedule('b1', 'userB', DateTime(2026, 3, 7)),
+        _schedule('b2', 'userB', DateTime(2026, 3, 8)),
+        _schedule('b3', 'userB', DateTime(2026, 3, 9)),
+        _schedule('c1', 'userA', DateTime(2026, 3, 14)),
+        _schedule('c2', 'userA', DateTime(2026, 3, 15)),
+        _schedule('c3', 'userA', DateTime(2026, 3, 16)),
+      ];
+      final req = _request(
+        'req1',
+        'a2', // anchor in Mar 1-3 (now userC)
+        'userA',
+        'userC',
+        ExtensionRequestStatus.accepted,
+      );
+      final requests = [req];
+
+      // a1, a2, a3 (Mar 1-3, now userC) → return the request.
+      expect(
+        getRequestForSchedule(schedules[0], schedules, requests),
+        req,
+        reason: 'a1 (Mar1, now userC) should match accepted request',
+      );
+      expect(
+        getRequestForSchedule(schedules[1], schedules, requests),
+        req,
+        reason: 'a2 (Mar2, anchor, now userC) should match accepted request',
+      );
+      expect(
+        getRequestForSchedule(schedules[2], schedules, requests),
+        req,
+        reason: 'a3 (Mar3, now userC) should match accepted request',
+      );
+
+      // b1, b2, b3 (Mar 7-9, userB, uninvolved) → return null (bug fix).
+      expect(
+        getRequestForSchedule(schedules[3], schedules, requests),
+        isNull,
+        reason: 'b1 (Mar7, userB, uninvolved) must NOT match — bug fix',
+      );
+      expect(
+        getRequestForSchedule(schedules[4], schedules, requests),
+        isNull,
+        reason: 'b2 (Mar8, userB, uninvolved) must NOT match — bug fix',
+      );
+      expect(
+        getRequestForSchedule(schedules[5], schedules, requests),
+        isNull,
+        reason: 'b3 (Mar9, userB, uninvolved) must NOT match — bug fix',
+      );
+
+      // c1, c2, c3 (Mar 14-16, now userA) → return the request.
+      expect(
+        getRequestForSchedule(schedules[6], schedules, requests),
+        req,
+        reason: 'c1 (Mar14, now userA) should match accepted request',
+      );
+      expect(
+        getRequestForSchedule(schedules[7], schedules, requests),
+        req,
+        reason: 'c2 (Mar15, now userA) should match accepted request',
+      );
+      expect(
+        getRequestForSchedule(schedules[8], schedules, requests),
+        req,
+        reason: 'c3 (Mar16, now userA) should match accepted request',
+      );
+    });
+
+    // Test 3: non-adjacent pending request only labels requester period
+    test('non-adjacent pending request — only requester period (A) labeled, '
+        'B and C return null', () {
+      // Pre-swap state: A wants to swap with C, B is uninvolved.
+      // A: Mar 1-3 (requester, anchor a2)
+      // B: Mar 7-9 (uninvolved)
+      // C: Mar 14-16 (target, not yet swapped)
+      final schedules = [
+        _schedule('a1', 'userA', DateTime(2026, 3, 1)),
+        _schedule('a2', 'userA', DateTime(2026, 3, 2)), // anchor
+        _schedule('a3', 'userA', DateTime(2026, 3, 3)),
+        _schedule('b1', 'userB', DateTime(2026, 3, 7)),
+        _schedule('b2', 'userB', DateTime(2026, 3, 8)),
+        _schedule('b3', 'userB', DateTime(2026, 3, 9)),
+        _schedule('c1', 'userC', DateTime(2026, 3, 14)),
+        _schedule('c2', 'userC', DateTime(2026, 3, 15)),
+        _schedule('c3', 'userC', DateTime(2026, 3, 16)),
+      ];
+      final req = _request(
+        'req1',
+        'a2',
+        'userA',
+        'userC',
+        ExtensionRequestStatus.pending,
+      );
+      final requests = [req];
+
+      // a1, a2, a3 (Mar 1-3, userA) → return the request.
+      expect(
+        getRequestForSchedule(schedules[0], schedules, requests),
+        req,
+        reason: 'a1 (Mar1, userA) should match pending request',
+      );
+      expect(
+        getRequestForSchedule(schedules[1], schedules, requests),
+        req,
+        reason: 'a2 (Mar2, anchor) should match pending request',
+      );
+      expect(
+        getRequestForSchedule(schedules[2], schedules, requests),
+        req,
+        reason: 'a3 (Mar3, userA) should match pending request',
+      );
+
+      // b1, b2, b3 (Mar 7-9, userB) → return null.
+      expect(
+        getRequestForSchedule(schedules[3], schedules, requests),
+        isNull,
+        reason: 'b1 (Mar7, userB) must NOT match pending request',
+      );
+      expect(
+        getRequestForSchedule(schedules[4], schedules, requests),
+        isNull,
+        reason: 'b2 (Mar8, userB) must NOT match pending request',
+      );
+      expect(
+        getRequestForSchedule(schedules[5], schedules, requests),
+        isNull,
+        reason: 'b3 (Mar9, userB) must NOT match pending request',
+      );
+
+      // c1, c2, c3 (Mar 14-16, userC) → return null (pending doesn't show
+      // on target).
+      expect(
+        getRequestForSchedule(schedules[6], schedules, requests),
+        isNull,
+        reason: 'c1 (Mar14, userC) must NOT match pending request',
+      );
+      expect(
+        getRequestForSchedule(schedules[7], schedules, requests),
+        isNull,
+        reason: 'c2 (Mar15, userC) must NOT match pending request',
+      );
+      expect(
+        getRequestForSchedule(schedules[8], schedules, requests),
+        isNull,
+        reason: 'c3 (Mar16, userC) must NOT match pending request',
+      );
+    });
+
+    // Test 5: 4 users, swap between 1st and 4th
+    test('4-user schedule — swap between 1st and 4th, B and C return null', () {
+      // Post-swap state: A↔D swap, B and C are uninvolved.
+      // D: Mar 1-3 (was A's, now userId=userD)
+      // B: Mar 7-9 (unchanged)
+      // C: Mar 14-16 (unchanged)
+      // A: Mar 21-23 (was D's, now userId=userA)
+      final schedules = [
+        _schedule('a1', 'userD', DateTime(2026, 3, 1)),
+        _schedule('a2', 'userD', DateTime(2026, 3, 2)), // anchor
+        _schedule('a3', 'userD', DateTime(2026, 3, 3)),
+        _schedule('b1', 'userB', DateTime(2026, 3, 7)),
+        _schedule('b2', 'userB', DateTime(2026, 3, 8)),
+        _schedule('b3', 'userB', DateTime(2026, 3, 9)),
+        _schedule('c1', 'userC', DateTime(2026, 3, 14)),
+        _schedule('c2', 'userC', DateTime(2026, 3, 15)),
+        _schedule('c3', 'userC', DateTime(2026, 3, 16)),
+        _schedule('d1', 'userA', DateTime(2026, 3, 21)),
+        _schedule('d2', 'userA', DateTime(2026, 3, 22)),
+        _schedule('d3', 'userA', DateTime(2026, 3, 23)),
+      ];
+      final req = _request(
+        'req1',
+        'a2', // anchor in Mar 1-3 (now userD)
+        'userA',
+        'userD',
+        ExtensionRequestStatus.accepted,
+      );
+      final requests = [req];
+
+      // A's original period (Mar 1-3, now userD) → return request.
+      expect(
+        getRequestForSchedule(schedules[0], schedules, requests),
+        req,
+        reason: 'a1 (Mar1, now userD) should match accepted request',
+      );
+      expect(
+        getRequestForSchedule(schedules[1], schedules, requests),
+        req,
+        reason: 'a2 (Mar2, anchor, now userD) should match accepted request',
+      );
+      expect(
+        getRequestForSchedule(schedules[2], schedules, requests),
+        req,
+        reason: 'a3 (Mar3, now userD) should match accepted request',
+      );
+
+      // B's period (Mar 7-9) → return null.
+      expect(
+        getRequestForSchedule(schedules[3], schedules, requests),
+        isNull,
+        reason: 'b1 (Mar7, userB) must NOT match — uninvolved',
+      );
+      expect(
+        getRequestForSchedule(schedules[4], schedules, requests),
+        isNull,
+        reason: 'b2 (Mar8, userB) must NOT match — uninvolved',
+      );
+      expect(
+        getRequestForSchedule(schedules[5], schedules, requests),
+        isNull,
+        reason: 'b3 (Mar9, userB) must NOT match — uninvolved',
+      );
+
+      // C's period (Mar 14-16) → return null.
+      expect(
+        getRequestForSchedule(schedules[6], schedules, requests),
+        isNull,
+        reason: 'c1 (Mar14, userC) must NOT match — uninvolved',
+      );
+      expect(
+        getRequestForSchedule(schedules[7], schedules, requests),
+        isNull,
+        reason: 'c2 (Mar15, userC) must NOT match — uninvolved',
+      );
+      expect(
+        getRequestForSchedule(schedules[8], schedules, requests),
+        isNull,
+        reason: 'c3 (Mar16, userC) must NOT match — uninvolved',
+      );
+
+      // D's original period (Mar 21-23, now userA) → return request.
+      expect(
+        getRequestForSchedule(schedules[9], schedules, requests),
+        req,
+        reason: 'd1 (Mar21, now userA) should match accepted request',
+      );
+      expect(
+        getRequestForSchedule(schedules[10], schedules, requests),
+        req,
+        reason: 'd2 (Mar22, now userA) should match accepted request',
+      );
+      expect(
+        getRequestForSchedule(schedules[11], schedules, requests),
+        req,
+        reason: 'd3 (Mar23, now userA) should match accepted request',
+      );
+    });
 
     test('rejected request — schedule in rejected request period still returns '
         'the request (for display purposes)', () {
