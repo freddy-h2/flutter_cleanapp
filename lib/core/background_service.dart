@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter_cleanapp/core/notification_dedup_service.dart';
 import 'package:flutter_cleanapp/core/notification_service.dart';
 import 'package:flutter_cleanapp/core/supabase_config.dart';
 import 'package:flutter_cleanapp/data/supabase_service.dart';
@@ -67,18 +68,22 @@ Future<void> _performBackgroundCheck() async {
   final newPendingIds = currentPendingIds.difference(knownPendingIds);
 
   for (final id in newPendingIds) {
-    final request = pendingData.firstWhere((r) => r['id'] == id);
-    final requesterId = request['requester_id'] as String;
-    // Try to get requester name.
-    final profile = await client
-        .from('profiles')
-        .select('name')
-        .eq('id', requesterId)
-        .maybeSingle();
-    final name = (profile?['name'] as String?) ?? 'Un vecino';
-    await NotificationService.instance.notifyProrrogaReceived(
-      requesterName: name,
-    );
+    if (await NotificationDedupService.instance.shouldNotify(
+      'extension_request:$id:pending',
+    )) {
+      final request = pendingData.firstWhere((r) => r['id'] == id);
+      final requesterId = request['requester_id'] as String;
+      // Try to get requester name.
+      final profile = await client
+          .from('profiles')
+          .select('name')
+          .eq('id', requesterId)
+          .maybeSingle();
+      final name = (profile?['name'] as String?) ?? 'Un vecino';
+      await NotificationService.instance.notifyProrrogaReceived(
+        requesterName: name,
+      );
+    }
   }
   await prefs.setStringList(
     _PrefKeys.lastKnownPendingExtensionIds,
@@ -111,11 +116,19 @@ Future<void> _performBackgroundCheck() async {
   final newAccepted = currentAcceptedIds.difference(knownAcceptedIds);
   final newRejected = currentRejectedIds.difference(knownRejectedIds);
 
-  if (newAccepted.isNotEmpty) {
-    await NotificationService.instance.notifyProrrogaAccepted();
+  for (final id in newAccepted) {
+    if (await NotificationDedupService.instance.shouldNotify(
+      'extension_request:$id:accepted',
+    )) {
+      await NotificationService.instance.notifyProrrogaAccepted();
+    }
   }
-  if (newRejected.isNotEmpty) {
-    await NotificationService.instance.notifyProrrogaRejected();
+  for (final id in newRejected) {
+    if (await NotificationDedupService.instance.shouldNotify(
+      'extension_request:$id:rejected',
+    )) {
+      await NotificationService.instance.notifyProrrogaRejected();
+    }
   }
 
   await prefs.setStringList(
@@ -143,11 +156,15 @@ Future<void> _performBackgroundCheck() async {
   );
 
   for (final id in newAnnouncementIds) {
-    final announcement = announcementsData.firstWhere((a) => a['id'] == id);
-    await NotificationService.instance.notifyAnnouncement(
-      title: announcement['title'] as String? ?? 'Anuncio',
-      body: announcement['message'] as String? ?? '',
-    );
+    if (await NotificationDedupService.instance.shouldNotify(
+      'announcement:$id',
+    )) {
+      final announcement = announcementsData.firstWhere((a) => a['id'] == id);
+      await NotificationService.instance.notifyAnnouncement(
+        title: announcement['title'] as String? ?? 'Anuncio',
+        body: announcement['message'] as String? ?? '',
+      );
+    }
   }
   await prefs.setStringList(
     _PrefKeys.lastKnownAnnouncementIds,
@@ -168,9 +185,14 @@ Future<void> _performBackgroundCheck() async {
     if (lastCount > 0 && currentCount > lastCount) {
       final newCount = currentCount - lastCount;
       for (var i = 0; i < newCount; i++) {
-        await NotificationService.instance.notifyNewComment(
-          commentIndex: lastCount + i,
-        );
+        final commentIndex = lastCount + i;
+        if (await NotificationDedupService.instance.shouldNotify(
+          'comment:$scheduleId:$commentIndex',
+        )) {
+          await NotificationService.instance.notifyNewComment(
+            commentIndex: commentIndex,
+          );
+        }
       }
     }
     await prefs.setInt(_PrefKeys.lastKnownCommentCount, currentCount);

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_cleanapp/core/notification_dedup_service.dart';
 import 'package:flutter_cleanapp/core/notification_service.dart';
 
 /// Top-level background message handler. MUST be a top-level function.
@@ -98,34 +99,61 @@ class PushNotificationService {
     // 2. Any message in foreground
     if (message.notification != null && !isBackground) {
       // Foreground: show via flutter_local_notifications
-      await NotificationService.instance.show(
-        id: _notificationIdForType(type),
-        title: message.notification!.title ?? 'Limpy',
-        body: message.notification!.body ?? '',
-      );
+      final dedupKey = 'fcm:${message.messageId ?? type ?? 'unknown'}';
+      if (await NotificationDedupService.instance.shouldNotify(dedupKey)) {
+        await NotificationService.instance.show(
+          id: _notificationIdForType(type),
+          title: message.notification!.title ?? 'Limpy',
+          body: message.notification!.body ?? '',
+        );
+      }
       return;
     }
 
     // Data-only message handling
     switch (type) {
       case 'announcement':
-        await NotificationService.instance.notifyAnnouncement(
-          title: data['title'] ?? 'Nuevo Anuncio',
-          body: data['message'] ?? '',
-        );
+        final announcementId =
+            data['announcement_id'] ?? data['title'] ?? 'unknown';
+        if (await NotificationDedupService.instance.shouldNotify(
+          'announcement:$announcementId',
+        )) {
+          await NotificationService.instance.notifyAnnouncement(
+            title: data['title'] ?? 'Nuevo Anuncio',
+            body: data['message'] ?? '',
+          );
+        }
       case 'extension_request':
         final status = data['status'] ?? 'pending';
+        final requestId = data['request_id'] ?? 'unknown';
         if (status == 'pending') {
-          await NotificationService.instance.notifyProrrogaReceived(
-            requesterName: data['requester_name'] ?? 'Un vecino',
-          );
+          if (await NotificationDedupService.instance.shouldNotify(
+            'extension_request:$requestId:pending',
+          )) {
+            await NotificationService.instance.notifyProrrogaReceived(
+              requesterName: data['requester_name'] ?? 'Un vecino',
+            );
+          }
         } else if (status == 'accepted') {
-          await NotificationService.instance.notifyProrrogaAccepted();
+          if (await NotificationDedupService.instance.shouldNotify(
+            'extension_request:$requestId:accepted',
+          )) {
+            await NotificationService.instance.notifyProrrogaAccepted();
+          }
         } else if (status == 'rejected') {
-          await NotificationService.instance.notifyProrrogaRejected();
+          if (await NotificationDedupService.instance.shouldNotify(
+            'extension_request:$requestId:rejected',
+          )) {
+            await NotificationService.instance.notifyProrrogaRejected();
+          }
         }
       case 'comment':
-        await NotificationService.instance.notifyNewComment(commentIndex: 0);
+        final commentId = data['comment_id'] ?? 'unknown';
+        if (await NotificationDedupService.instance.shouldNotify(
+          'comment:$commentId',
+        )) {
+          await NotificationService.instance.notifyNewComment(commentIndex: 0);
+        }
       default:
         debugPrint('FCM: unknown message type: $type');
     }

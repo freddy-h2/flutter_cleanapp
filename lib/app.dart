@@ -6,6 +6,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_cleanapp/core/background_service.dart';
+import 'package:flutter_cleanapp/core/notification_dedup_service.dart';
 import 'package:flutter_cleanapp/core/push_notification_service.dart';
 import 'package:flutter_cleanapp/core/realtime_service.dart';
 import 'package:flutter_cleanapp/core/supabase_config.dart';
@@ -257,6 +258,8 @@ class _LimpyAppState extends State<LimpyApp> with WidgetsBindingObserver {
     } catch (e) {
       debugPrint('Error deactivating FCM token: $e');
     }
+    // Clear notification dedup state on logout.
+    await NotificationDedupService.instance.clear();
     await SupabaseConfig.client.auth.signOut();
   }
 

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_cleanapp/core/notification_dedup_service.dart';
 import 'package:flutter_cleanapp/core/notification_service.dart';
 import 'package:flutter_cleanapp/core/realtime_service.dart';
 import 'package:flutter_cleanapp/data/supabase_service.dart';
@@ -332,9 +333,14 @@ class _HomeScreenState extends State<HomeScreen> {
           topLevelCount > _lastKnownCommentCount) {
         final newCount = topLevelCount - _lastKnownCommentCount;
         for (var i = 0; i < newCount; i++) {
-          NotificationService.instance.notifyNewComment(
-            commentIndex: _lastKnownCommentCount + i,
-          );
+          final commentIndex = _lastKnownCommentCount + i;
+          if (await NotificationDedupService.instance.shouldNotify(
+            'comment:${currentSchedule.id}:$commentIndex',
+          )) {
+            NotificationService.instance.notifyNewComment(
+              commentIndex: commentIndex,
+            );
+          }
         }
       }
       _lastKnownCommentCount = topLevelCount;
@@ -357,10 +363,14 @@ class _HomeScreenState extends State<HomeScreen> {
         for (final a in announcements) {
           if (!_dismissedAnnouncementIds.contains(a.id) &&
               !_knownAnnouncementIds.contains(a.id)) {
-            NotificationService.instance.notifyAnnouncement(
-              title: a.title,
-              body: a.message,
-            );
+            if (await NotificationDedupService.instance.shouldNotify(
+              'announcement:${a.id}',
+            )) {
+              NotificationService.instance.notifyAnnouncement(
+                title: a.title,
+                body: a.message,
+              );
+            }
           }
         }
         setState(() {
@@ -543,10 +553,18 @@ class _HomeScreenState extends State<HomeScreen> {
             .firstOrNull;
         if (ownRequest != null) {
           if (ownRequest.status == ExtensionRequestStatus.accepted) {
-            NotificationService.instance.notifyProrrogaAccepted();
+            if (await NotificationDedupService.instance.shouldNotify(
+              'extension_request:${ownRequest.id}:accepted',
+            )) {
+              NotificationService.instance.notifyProrrogaAccepted();
+            }
             _ownPendingRequestId = null;
           } else if (ownRequest.status == ExtensionRequestStatus.rejected) {
-            NotificationService.instance.notifyProrrogaRejected();
+            if (await NotificationDedupService.instance.shouldNotify(
+              'extension_request:${ownRequest.id}:rejected',
+            )) {
+              NotificationService.instance.notifyProrrogaRejected();
+            }
             _ownPendingRequestId = null;
           }
         }
@@ -590,9 +608,13 @@ class _HomeScreenState extends State<HomeScreen> {
       // Notify only once per unique incoming request.
       if (incoming.id != _notifiedIncomingRequestId) {
         _notifiedIncomingRequestId = incoming.id;
-        NotificationService.instance.notifyProrrogaReceived(
-          requesterName: requester?.name ?? 'Un vecino',
-        );
+        if (await NotificationDedupService.instance.shouldNotify(
+          'extension_request:${incoming.id}:pending',
+        )) {
+          NotificationService.instance.notifyProrrogaReceived(
+            requesterName: requester?.name ?? 'Un vecino',
+          );
+        }
 
         // Persist so restarts don't re-fire the notification.
         final prefs = await SharedPreferences.getInstance();
