@@ -229,7 +229,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 100),
       child: Form(
         key: _formKey,
         child: Column(
@@ -521,8 +521,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
             ),
-
-            const SizedBox(height: 24),
           ],
         ),
       ),

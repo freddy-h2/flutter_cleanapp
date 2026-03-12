@@ -1112,7 +1112,7 @@ class _HomeScreenState extends State<HomeScreen> {
         onRefresh: _loadData,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 100),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -1230,7 +1230,7 @@ class _HomeScreenState extends State<HomeScreen> {
       onRefresh: _loadData,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 100),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [

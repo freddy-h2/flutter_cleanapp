@@ -292,6 +292,7 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
           child: RefreshIndicator(
             onRefresh: _refreshAll,
             child: ListView.builder(
+              padding: const EdgeInsets.only(bottom: 100),
               itemCount: _tasks.length,
               itemBuilder: (context, index) {
                 final task = _tasks[index];
@@ -332,7 +333,12 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
         ),
         SafeArea(
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.only(
+              bottom: 100,
+              left: 16,
+              right: 16,
+              top: 16,
+            ),
             child: SizedBox(
               width: double.infinity,
               height: 48,

@@ -550,41 +550,44 @@ class _CommentsScreenState extends State<CommentsScreen> {
   Widget _buildSenderInputBar() {
     return SafeArea(
       top: false,
-      child: Container(
-        decoration: BoxDecoration(
-          border: Border(
-            top: BorderSide(color: Theme.of(context).dividerColor),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 100),
+        child: Container(
+          decoration: BoxDecoration(
+            border: Border(
+              top: BorderSide(color: Theme.of(context).dividerColor),
+            ),
           ),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _messageController,
-                maxLines: 1,
-                maxLength: 280,
-                decoration: InputDecoration(
-                  hintText: 'Escribe un comentario...',
-                  counterText: '',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _messageController,
+                  maxLines: 1,
+                  maxLength: 280,
+                  decoration: InputDecoration(
+                    hintText: 'Escribe un comentario...',
+                    counterText: '',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                    isDense: true,
                   ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
-                  ),
-                  isDense: true,
                 ),
               ),
-            ),
-            const SizedBox(width: 8),
-            IconButton(
-              icon: const Icon(CupertinoIcons.paperplane_fill),
-              tooltip: 'Enviar comentario',
-              onPressed: _sendComment,
-            ),
-          ],
+              const SizedBox(width: 8),
+              IconButton(
+                icon: const Icon(CupertinoIcons.paperplane_fill),
+                tooltip: 'Enviar comentario',
+                onPressed: _sendComment,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -657,6 +660,7 @@ class _CommentsScreenState extends State<CommentsScreen> {
     return RefreshIndicator(
       onRefresh: _loadData,
       child: ListView.separated(
+        padding: const EdgeInsets.only(bottom: 100),
         itemCount: entries.length,
         separatorBuilder: (context, index) =>
             const Divider(height: 1, indent: 72),

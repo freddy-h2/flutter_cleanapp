@@ -506,6 +506,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     TextTheme textTheme,
   ) {
     return ListView.builder(
+      padding: const EdgeInsets.only(bottom: 100),
       itemCount: items.length,
       itemBuilder: (context, index) {
         final item = items[index];
@@ -1043,7 +1044,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
               child: _isGridView
                   ? SingleChildScrollView(
                       physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      padding: const EdgeInsets.only(
+                        left: 8,
+                        right: 8,
+                        bottom: 100,
+                      ),
                       child: _buildGridView(schedules, colorScheme, textTheme),
                     )
                   : _buildListView(items, colorScheme, textTheme),
