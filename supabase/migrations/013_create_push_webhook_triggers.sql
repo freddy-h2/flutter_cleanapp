@@ -77,9 +77,10 @@ BEGIN
           'title',     'Limpy - ' || COALESCE(NEW.title, 'Nuevo Anuncio'),
           'body',      COALESCE(NEW.message, ''),
           'data',      jsonb_build_object(
-            'type',    'announcement',
-            'title',   COALESCE(NEW.title, 'Nuevo Anuncio'),
-            'message', COALESCE(NEW.message, '')
+            'type',            'announcement',
+            'announcement_id', NEW.id::text,
+            'title',           COALESCE(NEW.title, 'Nuevo Anuncio'),
+            'message',         COALESCE(NEW.message, '')
           )
         )
       );
