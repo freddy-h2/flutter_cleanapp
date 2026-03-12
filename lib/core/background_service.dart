@@ -182,6 +182,13 @@ Future<void> _performBackgroundCheck() async {
   } catch (_) {
     // Non-fatal — cleanup will retry on next periodic check
   }
+
+  // Clean up old notification dedup events
+  try {
+    await SupabaseService.instance.cleanupOldNotificationEvents();
+  } catch (_) {
+    // Non-fatal — cleanup will retry on next periodic check
+  }
 }
 
 /// Manages background notification polling via [Workmanager].

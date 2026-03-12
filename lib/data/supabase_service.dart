@@ -701,6 +701,11 @@ class SupabaseService {
     return (result as int?) ?? 0;
   }
 
+  /// Delete notification_events older than 7 days.
+  Future<void> cleanupOldNotificationEvents() async {
+    await SupabaseConfig.client.rpc('cleanup_old_notification_events');
+  }
+
   /// Updates an existing announcement (admin only).
   Future<void> updateAnnouncement({
     required String announcementId,
